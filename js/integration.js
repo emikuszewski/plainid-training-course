@@ -736,7 +736,7 @@ const PlainIDCourse = {
             
             // Module 1 is always available
             if (moduleId === 1) {
-                if (moduleStatus && moduleStatus.textContent === 'Locked') {
+                if (moduleStatus && (moduleStatus.textContent === 'Locked' || moduleStatus.textContent === 'Not Started')) {
                     moduleStatus.textContent = 'Not Started';
                     moduleStatus.className = 'module-status';
                     this.unlockFirstLesson(moduleElement);
@@ -744,8 +744,10 @@ const PlainIDCourse = {
                 return;
             }
             
-            // Unlock next module after the last completed one
+            // Fixed: Changed the logic to properly unlock the next module
+            // If this module is the next one after the last completed module
             if (moduleId === lastCompletedModule + 1) {
+                // Unlock this module if it's locked
                 if (moduleStatus && (moduleStatus.textContent === 'Locked' || moduleStatus.textContent === 'Not Started')) {
                     moduleStatus.textContent = 'Not Started';
                     moduleStatus.className = 'module-status';
@@ -764,6 +766,7 @@ const PlainIDCourse = {
                 const prevModuleId = moduleId - 1;
                 const prevModuleProgress = this.calculateModuleProgress(prevModuleId);
                 
+                // If previous module is at least 50% complete
                 if (prevModuleProgress >= 50) {
                     moduleStatus.textContent = 'Not Started';
                     moduleStatus.className = 'module-status';
@@ -778,12 +781,18 @@ const PlainIDCourse = {
     
     // Unlock the first lesson in a module
     unlockFirstLesson: function(moduleElement) {
+        // FIX: Improved to handle potential DOM/state issues
+        if (!moduleElement) return;
+        
         const firstLessonHeader = moduleElement.querySelector('.accordion-header');
         if (firstLessonHeader) {
             const statusElement = firstLessonHeader.querySelector('.status');
             if (statusElement) {
-                statusElement.textContent = 'Start';
-                statusElement.className = 'status';
+                // Only change status if it's locked
+                if (statusElement.textContent === 'Locked') {
+                    statusElement.textContent = 'Start';
+                    statusElement.className = 'status';
+                }
             }
         }
     },
