@@ -111,7 +111,7 @@ class QuizManager {
         if (!questionContainer || questionContainer.classList.contains('answered')) return;
         
         const moduleId = questionContainer.getAttribute('data-module');
-        const lessonId = questionContainer.getAttribute('data-lesson');
+        const lessonId = questionContainer.getAttribute('data-question');
         const questionId = questionContainer.getAttribute('data-question');
         
         // Only proceed if we have valid module and lesson IDs
@@ -197,6 +197,9 @@ class QuizManager {
                     this.results[moduleId][lessonId].completed = true;
                 }
                 
+                // Get correct lessonId from the parent quiz question
+                const correctLessonId = questionContainer.getAttribute('data-lesson');
+                
                 // Show completion message
                 const completionStatus = quizContainer.querySelector('.quiz-completion-status');
                 if (completionStatus) {
@@ -222,14 +225,14 @@ class QuizManager {
                     const continueButton = document.createElement('button');
                     continueButton.className = 'btn continue-button';
                     continueButton.textContent = 'Continue to Next Lesson';
-                    continueButton.addEventListener('click', () => this.navigateToNextLesson(moduleId, lessonId));
+                    continueButton.addEventListener('click', () => this.navigateToNextLesson(moduleId, correctLessonId));
                     completionStatus.appendChild(continueButton);
                     
                     // Animate completion
                     completionStatus.classList.add('slide-in-animation');
                     
-                    // Mark lesson as complete
-                    this.markLessonComplete(moduleId, lessonId);
+                    // Mark lesson as complete - make sure we use the correct lessonId from the question
+                    this.markLessonComplete(moduleId, correctLessonId);
                 }
             }
         } else {
@@ -274,13 +277,21 @@ class QuizManager {
     }
 
     navigateToNextLesson(moduleId, lessonId) {
+        console.log(`Navigating to next lesson after completing module ${moduleId}, lesson ${lessonId}`);
+        
         // Get the current lesson header
         const currentHeader = document.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
-        if (!currentHeader) return;
+        if (!currentHeader) {
+            console.warn(`Could not find header for module ${moduleId}, lesson ${lessonId}`);
+            return;
+        }
         
         // Get all headers in this module
         const module = document.getElementById(`module${moduleId}`);
-        if (!module) return;
+        if (!module) {
+            console.warn(`Could not find module element for module ${moduleId}`);
+            return;
+        }
         
         const headers = Array.from(module.querySelectorAll('.accordion-header'));
         const currentIndex = headers.indexOf(currentHeader);
@@ -296,6 +307,14 @@ class QuizManager {
                 currentContent.classList.remove('active');
             }
             
+            // Check if next lesson is locked
+            const statusElement = nextHeader.querySelector('.status');
+            if (statusElement && statusElement.textContent === 'Locked') {
+                console.log(`Unlocking next lesson in module ${moduleId}`);
+                statusElement.textContent = 'Start';
+                statusElement.className = 'status';
+            }
+            
             // Open next lesson
             nextHeader.classList.add('active');
             const nextContent = nextHeader.nextElementSibling;
@@ -305,13 +324,6 @@ class QuizManager {
             
             // Scroll to next lesson
             nextHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            
-            // FIX: If next lesson is locked, unlock it
-            const statusElement = nextHeader.querySelector('.status');
-            if (statusElement && statusElement.textContent === 'Locked') {
-                statusElement.textContent = 'Start';
-                statusElement.className = 'status';
-            }
         } else {
             // This was the last lesson in the module
             // Try to navigate to next module
@@ -319,10 +331,14 @@ class QuizManager {
             const nextModule = document.getElementById(`module${nextModuleId}`);
             
             if (nextModule) {
+                console.log(`Moving to next module ${nextModuleId}`);
+                
                 // Check if the next module is locked
                 const moduleStatus = nextModule.querySelector('.module-status');
                 if (moduleStatus && moduleStatus.textContent === 'Locked') {
-                    // FIX: Automatically unlock next module when completing the last lesson of current module
+                    console.log(`Unlocking next module ${nextModuleId}`);
+                    
+                    // Unlock the module
                     moduleStatus.textContent = 'Not Started';
                     moduleStatus.className = 'module-status';
                     
@@ -346,17 +362,19 @@ class QuizManager {
                 // Open first lesson in next module, if available
                 const firstHeader = nextModule.querySelector('.accordion-header');
                 if (firstHeader) {
+                    // Unlock first lesson if needed
+                    const firstStatusElement = firstHeader.querySelector('.status');
+                    if (firstStatusElement && firstStatusElement.textContent === 'Locked') {
+                        console.log(`Unlocking first lesson in next module ${nextModuleId}`);
+                        firstStatusElement.textContent = 'Start';
+                        firstStatusElement.className = 'status';
+                    }
+                    
+                    // Open the lesson
                     firstHeader.classList.add('active');
                     const firstContent = firstHeader.nextElementSibling;
                     if (firstContent) {
                         firstContent.classList.add('active');
-                    }
-                    
-                    // FIX: Make sure first lesson is unlocked
-                    const firstStatusElement = firstHeader.querySelector('.status');
-                    if (firstStatusElement && firstStatusElement.textContent === 'Locked') {
-                        firstStatusElement.textContent = 'Start';
-                        firstStatusElement.className = 'status';
                     }
                 }
                 
@@ -367,6 +385,8 @@ class QuizManager {
                 }
             } else {
                 // No more modules
+                console.log("No more modules available - course complete!");
+                
                 if (window.showNotification) {
                     window.showNotification('Congratulations! You have completed all the modules.', 'success');
                 } else {
@@ -383,6 +403,8 @@ class QuizManager {
     }
 
     markLessonComplete(moduleId, lessonId) {
+        console.log(`Quiz marking lesson ${lessonId} in module ${moduleId} as complete`);
+        
         // Call the global lesson completion function if available
         if (typeof window.markLessonComplete === 'function') {
             window.markLessonComplete(moduleId, lessonId);
@@ -390,7 +412,7 @@ class QuizManager {
         }
         
         // Fallback implementation if the global function isn't available
-        console.log(`Lesson ${lessonId} in Module ${moduleId} completed`);
+        console.log(`Fallback: Marking lesson ${lessonId} in module ${moduleId} as complete`);
         
         // Update UI elements directly
         const lessonHeader = document.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
@@ -399,7 +421,11 @@ class QuizManager {
             if (statusElement) {
                 statusElement.textContent = 'Completed';
                 statusElement.className = 'status completed';
+            } else {
+                console.warn(`Status element not found for module ${moduleId}, lesson ${lessonId}`);
             }
+        } else {
+            console.warn(`Lesson header not found for module ${moduleId}, lesson ${lessonId}`);
         }
         
         // Try to save progress to localStorage as fallback
@@ -431,15 +457,23 @@ class QuizManager {
             if (moduleElement) {
                 const lessonHeaders = moduleElement.querySelectorAll('.accordion-header');
                 let allCompleted = true;
+                let totalLessons = 0;
                 
                 lessonHeaders.forEach(header => {
                     const lId = header.getAttribute('data-lesson');
-                    if (lId && !progress.modules[moduleId].lessons[lId]) {
-                        allCompleted = false;
+                    if (lId) {
+                        totalLessons++;
+                        if (!progress.modules[moduleId].lessons[lId]) {
+                            allCompleted = false;
+                        }
                     }
                 });
                 
-                if (allCompleted && lessonHeaders.length > 0) {
+                console.log(`Module ${moduleId} completion check: ${Object.keys(progress.modules[moduleId].lessons).length}/${totalLessons} lessons completed`);
+                
+                if (allCompleted && totalLessons > 0) {
+                    console.log(`All lessons in module ${moduleId} are complete - marking module as complete`);
+                    
                     progress.modules[moduleId].completed = true;
                     
                     // Update module status in UI
@@ -462,12 +496,16 @@ class QuizManager {
     }
     
     unlockNextModule(completedModuleId) {
+        console.log(`Quiz trying to unlock next module after module ${completedModuleId}`);
+        
         const nextModuleId = completedModuleId + 1;
         const nextModuleElement = document.getElementById(`module${nextModuleId}`);
         
         if (nextModuleElement) {
             const moduleStatus = nextModuleElement.querySelector('.module-status');
             if (moduleStatus && (moduleStatus.textContent === 'Locked' || moduleStatus.textContent === 'Not Started')) {
+                console.log(`Unlocking module ${nextModuleId}`);
+                
                 moduleStatus.textContent = 'Not Started';
                 moduleStatus.className = 'module-status';
                 
