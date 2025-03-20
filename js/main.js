@@ -275,7 +275,7 @@ function unlockNextModule(completedModuleId) {
     
     if (nextModule) {
         const moduleStatus = nextModule.querySelector('.module-status');
-        if (moduleStatus && moduleStatus.textContent === 'Locked') {
+        if (moduleStatus && (moduleStatus.textContent === 'Locked' || moduleStatus.textContent === 'Not Started')) {
             // Change status to Not Started
             moduleStatus.textContent = 'Not Started';
             moduleStatus.className = 'module-status';
@@ -510,6 +510,7 @@ function addProgressMonitor() {
                 }
             }
             
+            // FIX: Make sure the next module is unlocked
             if (lastCompletedModule > 0) {
                 const nextModuleId = lastCompletedModule + 1;
                 const nextModule = document.getElementById(`module${nextModuleId}`);
@@ -553,6 +554,22 @@ function addProgressMonitor() {
                         if (statusElement) {
                             statusElement.textContent = 'Start';
                             statusElement.className = 'status';
+                        }
+                    }
+                }
+            }
+            
+            // Fix any partially completed modules with incorrect status
+            for (const moduleId in progress.modules) {
+                const module = progress.modules[moduleId];
+                if (!module.completed && Object.keys(module.lessons || {}).length > 0) {
+                    const moduleElement = document.getElementById(`module${moduleId}`);
+                    if (moduleElement) {
+                        const moduleStatus = moduleElement.querySelector('.module-status');
+                        if (moduleStatus && moduleStatus.textContent === 'Locked') {
+                            console.log(`[Progress Monitor] Fixing module ${moduleId} status - should be 'In Progress'`);
+                            moduleStatus.textContent = 'In Progress';
+                            moduleStatus.className = 'module-status ready';
                         }
                     }
                 }
