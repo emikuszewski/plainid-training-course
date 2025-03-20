@@ -554,6 +554,18 @@ class ModuleNavigator {
             
             // Navigate to the next module
             this.navigateToModule(nextModuleId);
+            
+            // FIX: Force unlock first lesson in the next module
+            setTimeout(() => {
+                const firstLesson = nextModule.querySelector('.accordion-header');
+                if (firstLesson) {
+                    const statusElement = firstLesson.querySelector('.status');
+                    if (statusElement && statusElement.textContent === 'Locked') {
+                        statusElement.textContent = 'Start';
+                        statusElement.className = 'status';
+                    }
+                }
+            }, 500);
         }
     }
 }
