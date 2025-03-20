@@ -207,13 +207,33 @@ class PersonalizedLearningPath {
         // Set up event listeners
         this.setupEventListeners();
         
-        // If no profile exists, prompt for profile creation
-        if (!this.userProfileExists()) {
-            this.promptProfileCreation();
-        } else {
-            // Apply personalization based on existing profile
-            this.applyPersonalization();
+        // FIX: Add completedModules array if it doesn't exist
+        if (!this.userProfile.completedModules) {
+            this.userProfile.completedModules = [];
         }
+        
+        // FIX: Initialize skillLevels if it doesn't exist
+        if (!this.userProfile.skillLevels) {
+            this.userProfile.skillLevels = {
+                'core-concepts': 0,
+                'architecture': 0,
+                'policy-design': 0,
+                'implementation': 0,
+                'advanced-features': 0,
+                'best-practices': 0
+            };
+        }
+        
+        // FIX: Add a small delay to prevent race conditions with other components
+        setTimeout(() => {
+            // If no profile exists, prompt for profile creation
+            if (!this.userProfileExists()) {
+                this.promptProfileCreation();
+            } else {
+                // Apply personalization based on existing profile
+                this.applyPersonalization();
+            }
+        }, 500);
     }
     
     /**
@@ -223,10 +243,48 @@ class PersonalizedLearningPath {
         try {
             const storedProfile = localStorage.getItem('plainidUserProfile');
             if (storedProfile) {
-                this.userProfile = JSON.parse(storedProfile);
+                // FIX: Use proper merging of stored profile with default structure
+                const parsedProfile = JSON.parse(storedProfile);
+                this.userProfile = {
+                    ...this.userProfile,  // Keep default structure
+                    ...parsedProfile       // Override with stored values
+                };
+                
+                // FIX: Ensure essential properties exist
+                if (!this.userProfile.completedModules) {
+                    this.userProfile.completedModules = [];
+                }
+                
+                if (!this.userProfile.skillLevels) {
+                    this.userProfile.skillLevels = {
+                        'core-concepts': 0,
+                        'architecture': 0,
+                        'policy-design': 0,
+                        'implementation': 0,
+                        'advanced-features': 0,
+                        'best-practices': 0
+                    };
+                }
             }
         } catch (error) {
             console.error('Error loading user profile:', error);
+            // FIX: Reset to default profile on error
+            this.userProfile = {
+                role: '',
+                industry: '',
+                experience: '',
+                learningGoals: [],
+                learningStyle: '',
+                completedModules: [],
+                skillLevels: {
+                    'core-concepts': 0,
+                    'architecture': 0,
+                    'policy-design': 0,
+                    'implementation': 0,
+                    'advanced-features': 0,
+                    'best-practices': 0
+                }
+            };
         }
     }
     
@@ -260,7 +318,14 @@ class PersonalizedLearningPath {
      * @returns {boolean} Whether a user profile exists
      */
     userProfileExists() {
-        return this.userProfile.role !== '' && this.userProfile.industry !== '';
+        // FIX: Improve validation to check if the profile actually has content
+        return (
+            this.userProfile && 
+            typeof this.userProfile.role === 'string' && 
+            this.userProfile.role.trim() !== '' &&
+            typeof this.userProfile.industry === 'string' && 
+            this.userProfile.industry.trim() !== ''
+        );
     }
     
     /**
@@ -268,6 +333,11 @@ class PersonalizedLearningPath {
      * @param {boolean} isUpdate - Whether this is an update to an existing profile
      */
     promptProfileCreation(isUpdate = false) {
+        // FIX: Check if profile creation form already exists to prevent duplicates
+        if (document.getElementById('profile-overlay')) {
+            return;
+        }
+        
         // Create profile form overlay
         const overlay = document.createElement('div');
         overlay.className = 'profile-overlay';
@@ -347,8 +417,8 @@ class PersonalizedLearningPath {
             const checked = this.userProfile.learningGoals && this.userProfile.learningGoals.includes(goal) ? 'checked' : '';
             html += `
                 <div class="checkbox-item">
-                    <input type="checkbox" id="goal-${goal.replace(/\s+/g, '-').toLowerCase()}" name="learningGoals" value="${goal}" ${checked}>
-                    <label for="goal-${goal.replace(/\s+/g, '-').toLowerCase()}">${goal}</label>
+                    <input type="checkbox" id="goal-${goal.replace(/\\s+/g, '-').toLowerCase()}" name="learningGoals" value="${goal}" ${checked}>
+                    <label for="goal-${goal.replace(/\\s+/g, '-').toLowerCase()}">${goal}</label>
                 </div>
             `;
         });
@@ -367,8 +437,8 @@ class PersonalizedLearningPath {
             const checked = this.userProfile.learningStyle === style ? 'checked' : '';
             html += `
                 <div class="radio-item">
-                    <input type="radio" id="style-${style.replace(/\s+/g, '-').toLowerCase()}" name="learningStyle" value="${style}" ${checked}>
-                    <label for="style-${style.replace(/\s+/g, '-').toLowerCase()}">${style}</label>
+                    <input type="radio" id="style-${style.replace(/\\s+/g, '-').toLowerCase()}" name="learningStyle" value="${style}" ${checked}>
+                    <label for="style-${style.replace(/\\s+/g, '-').toLowerCase()}">${style}</label>
                 </div>
             `;
         });
@@ -418,6 +488,12 @@ class PersonalizedLearningPath {
                 learningStyle: formData.get('learningStyle')
             };
             
+            // FIX: Validate required fields before saving
+            if (!profileData.role || !profileData.industry || !profileData.experience || !profileData.learningStyle) {
+                alert('Please fill in all required fields.');
+                return;
+            }
+            
             // Save profile
             this.saveUserProfile(profileData);
             
@@ -455,6 +531,18 @@ class PersonalizedLearningPath {
                 }
             });
         });
+        
+        // FIX: Default selection for required radio buttons if none selected
+        const learningStyleRadios = document.querySelectorAll('input[name="learningStyle"]');
+        let hasCheckedStyle = false;
+        learningStyleRadios.forEach(radio => {
+            if (radio.checked) hasCheckedStyle = true;
+        });
+        
+        // Select first option by default if none selected
+        if (!hasCheckedStyle && learningStyleRadios.length > 0) {
+            learningStyleRadios[0].checked = true;
+        }
     }
     
     /**
@@ -484,8 +572,8 @@ class PersonalizedLearningPath {
             'Your learning path has been personalized based on your profile.';
         
         // Show notification using the notification system if available
-        if (typeof showNotification === 'function') {
-            showNotification(message, 'success', 5000);
+        if (typeof window.showNotification === 'function') {
+            window.showNotification(message, 'success', 5000);
         } else {
             alert(message);
         }
@@ -517,26 +605,32 @@ class PersonalizedLearningPath {
      * @param {Object} profileData - The user profile data to save
      */
     saveUserProfile(profileData) {
-        // Merge with existing profile (keeping progress data)
+        // FIX: Properly merge with existing profile (keeping progress data)
         this.userProfile = {
-            ...this.userProfile,
-            ...profileData
-        };
-        
-        // Initialize skill levels if not set
-        if (!this.userProfile.skillLevels || Object.keys(this.userProfile.skillLevels).length === 0) {
-            this.userProfile.skillLevels = {
+            ...this.userProfile,  // Keep existing properties
+            ...profileData,       // Update with new profile data
+            // Ensure these arrays and objects are preserved or initialized
+            completedModules: this.userProfile.completedModules || [],
+            skillLevels: this.userProfile.skillLevels || {
                 'core-concepts': 0,
                 'architecture': 0,
                 'policy-design': 0,
                 'implementation': 0,
                 'advanced-features': 0,
                 'best-practices': 0
-            };
-        }
+            }
+        };
         
         // Save to localStorage
-        localStorage.setItem('plainidUserProfile', JSON.stringify(this.userProfile));
+        try {
+            localStorage.setItem('plainidUserProfile', JSON.stringify(this.userProfile));
+        } catch (error) {
+            console.error('Error saving user profile:', error);
+            // FIX: Show error message to user
+            if (typeof window.showNotification === 'function') {
+                window.showNotification('There was an error saving your profile. Please try again.', 'error', 5000);
+            }
+        }
         
         // Apply personalization based on new profile
         this.applyPersonalization();
@@ -548,26 +642,34 @@ class PersonalizedLearningPath {
     applyPersonalization() {
         if (!this.userProfileExists()) return;
         
-        // Reorder modules based on role
-        this.reorderModules();
-        
-        // Inject industry-specific content
-        this.injectIndustryContent();
-        
-        // Adjust content depth based on experience level
-        this.adjustContentDepth();
-        
-        // Highlight content based on learning goals
-        this.highlightRelevantContent();
-        
-        // Adapt content based on learning style
-        this.adaptToLearningStyle();
-        
-        // Update learning path visualization
-        this.updateLearningPathDisplay();
-        
-        // Show recommended modules based on current progress
-        this.showRecommendations();
+        try {
+            // Reorder modules based on role
+            this.reorderModules();
+            
+            // Inject industry-specific content
+            this.injectIndustryContent();
+            
+            // Adjust content depth based on experience level
+            this.adjustContentDepth();
+            
+            // Highlight content based on learning goals
+            this.highlightRelevantContent();
+            
+            // Adapt content based on learning style
+            this.adaptToLearningStyle();
+            
+            // Update learning path visualization
+            this.updateLearningPathDisplay();
+            
+            // Show recommended modules based on current progress
+            this.showRecommendations();
+        } catch (error) {
+            console.error('Error applying personalization:', error);
+            // FIX: Show error message but don't block the user
+            if (typeof window.showNotification === 'function') {
+                window.showNotification('There was an error personalizing your content. Please try refreshing the page.', 'warning', 5000);
+            }
+        }
     }
     
     /**
@@ -660,30 +762,40 @@ class PersonalizedLearningPath {
     reattachEventListeners() {
         // Reinitialize accordions
         const accordionHeaders = document.querySelectorAll('.accordion-header');
-        if (typeof initializeAccordions === 'function') {
-            initializeAccordions(accordionHeaders);
+        if (typeof window.initializeAccordions === 'function') {
+            window.initializeAccordions(accordionHeaders);
         } else {
             // Basic accordion functionality
             accordionHeaders.forEach(header => {
-                header.addEventListener('click', function() {
-                    const content = this.nextElementSibling;
-                    this.classList.toggle('active');
-                    content.classList.toggle('active');
-                });
+                // FIX: Check if event listener was already added
+                if (header.getAttribute('data-has-listener') !== 'true') {
+                    header.setAttribute('data-has-listener', 'true');
+                    
+                    header.addEventListener('click', function() {
+                        const content = this.nextElementSibling;
+                        this.classList.toggle('active');
+                        content.classList.toggle('active');
+                    });
+                }
             });
         }
         
         // Reinitialize module links
         const moduleLinks = document.querySelectorAll('.module-link');
         moduleLinks.forEach(link => {
-            link.addEventListener('click', (e) => {
-                e.preventDefault();
-                const moduleId = link.getAttribute('data-module');
-                const moduleElement = document.getElementById(`module${moduleId}`);
-                if (moduleElement) {
-                    moduleElement.scrollIntoView({ behavior: 'smooth' });
-                }
-            });
+            // FIX: Check if event listener was already added
+            if (link.getAttribute('data-has-listener') !== 'true') {
+                link.setAttribute('data-has-listener', 'true');
+                
+                link.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const moduleId = link.getAttribute('data-module');
+                    const moduleElement = document.getElementById(`module${moduleId}`);
+                    if (moduleElement) {
+                        moduleElement.scrollIntoView({ behavior: 'smooth' });
+                    }
+                });
+            }
         });
     }
     
@@ -774,17 +886,6 @@ class PersonalizedLearningPath {
             case 'Beginner':
                 // Show beginner content, hide advanced
                 beginnerSections.forEach(section => {
-                    section.style.display = 'block';
-                    section.classList.add('personalized-content');
-                });
-                advancedSections.forEach(section => {
-                    section.style.display = 'none';
-                });
-                break;
-                
-            case 'Intermediate':
-                // Show intermediate content
-                intermediateSections.forEach(section => {
                     section.style.display = 'block';
                     section.classList.add('personalized-content');
                 });
@@ -1047,6 +1148,12 @@ class PersonalizedLearningPath {
      * Update learning path visualization
      */
     updateLearningPathDisplay() {
+        // FIX: Check if DOM is ready before manipulating it
+        if (!document.getElementById('about')) {
+            console.warn('DOM not ready for learning path display');
+            return;
+        }
+        
         // Check if learning path container exists
         let pathContainer = document.getElementById('learning-path-display');
         
@@ -1165,7 +1272,9 @@ class PersonalizedLearningPath {
      */
     isModuleCompleted(moduleId) {
         // Check completedModules array
-        if (this.userProfile.completedModules && this.userProfile.completedModules.includes(moduleId)) {
+        if (this.userProfile.completedModules && 
+            Array.isArray(this.userProfile.completedModules) && 
+            this.userProfile.completedModules.includes(parseInt(moduleId))) {
             return true;
         }
         
@@ -1196,7 +1305,7 @@ class PersonalizedLearningPath {
         
         for (const id of moduleSequence) {
             if (!this.isModuleCompleted(id)) {
-                return id === moduleId;
+                return id === parseInt(moduleId);
             }
         }
         
@@ -1244,6 +1353,12 @@ class PersonalizedLearningPath {
      * Show recommended modules based on current progress
      */
     showRecommendations() {
+        // FIX: Check if DOM is ready before manipulating it
+        if (!document.getElementById('modules')) {
+            console.warn('DOM not ready for recommendations');
+            return;
+        }
+        
         // Create recommendations container if it doesn't exist
         let recommendationsContainer = document.getElementById('learning-recommendations');
         
@@ -1350,7 +1465,7 @@ class PersonalizedLearningPath {
         
         // Add skill-based recommendation
         const weakestSkill = this.getWeakestSkill();
-        if (weakestSkill) {
+        if (weakestSkill && this.skillCategories[weakestSkill]) {
             recommendations.push({
                 title: `Improve ${this.skillCategories[weakestSkill].name}`,
                 description: `Focus on strengthening your ${this.skillCategories[weakestSkill].name.toLowerCase()} to become a well-rounded professional.`,
@@ -1439,6 +1554,11 @@ class PersonalizedLearningPath {
         // Check if module is completed
         const isModuleCompleted = this.isModuleCompleted(moduleId);
         
+        // FIX: Ensure completedModules array exists
+        if (!Array.isArray(this.userProfile.completedModules)) {
+            this.userProfile.completedModules = [];
+        }
+        
         if (isModuleCompleted && !this.userProfile.completedModules.includes(parseInt(moduleId))) {
             // Add to completed modules
             this.userProfile.completedModules.push(parseInt(moduleId));
@@ -1450,7 +1570,11 @@ class PersonalizedLearningPath {
         }
         
         // Save updated profile
-        localStorage.setItem('plainidUserProfile', JSON.stringify(this.userProfile));
+        try {
+            localStorage.setItem('plainidUserProfile', JSON.stringify(this.userProfile));
+        } catch (error) {
+            console.error('Error saving updated profile:', error);
+        }
         
         // Update recommendations
         this.showRecommendations();
@@ -1510,6 +1634,7 @@ class PersonalizedLearningPath {
                 display: flex;
                 flex-direction: column;
                 animation: slideUp 0.4s ease;
+                overflow-y: auto;
             }
             
             @keyframes slideUp {
@@ -1579,6 +1704,7 @@ class PersonalizedLearningPath {
                 border-radius: 6px;
                 font-size: 1rem;
                 color: #333;
+                background-color: #fff;
             }
             
             .checkbox-group, .radio-group {
@@ -2035,5 +2161,19 @@ class PersonalizedLearningPath {
 
 // Initialize the personalized learning path system
 document.addEventListener('DOMContentLoaded', () => {
-    window.personalizedLearningPath = new PersonalizedLearningPath();
-});
+    // FIX: Wait to ensure DOM is fully loaded before initialization
+    setTimeout(() => {
+        window.personalizedLearningPath = new PersonalizedLearningPath();
+    }, 1000);
+});personalized-content');
+                });
+                advancedSections.forEach(section => {
+                    section.style.display = 'none';
+                });
+                break;
+                
+            case 'Intermediate':
+                // Show intermediate content
+                intermediateSections.forEach(section => {
+                    section.style.display = 'block';
+                    section.classList.add('
