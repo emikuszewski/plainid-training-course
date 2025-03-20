@@ -31,7 +31,7 @@ class ModuleNavigator {
         moduleContainers.forEach(container => {
             // Get module information
             const moduleId = container.id.replace('module', '');
-            const moduleTitle = container.querySelector('.module-header h3').textContent;
+            const moduleTitle = container.querySelector('.module-header h3')?.textContent || `Module ${moduleId}`;
             
             // Create navigation data attribute
             container.setAttribute('data-nav-module', moduleId);
@@ -42,6 +42,7 @@ class ModuleNavigator {
             if (lessonHeaders.length > 0) {
                 const breadcrumbList = document.createElement('div');
                 breadcrumbList.className = 'breadcrumb-list';
+                breadcrumbList.id = `breadcrumb-module-${moduleId}`;
                 breadcrumbList.style.display = 'none';
                 
                 // Add module title to breadcrumb
@@ -68,24 +69,7 @@ class ModuleNavigator {
                 container.setAttribute('data-breadcrumb-id', breadcrumbList.id);
                 
                 // Update lesson titles in breadcrumb when accordion is clicked
-                lessonHeaders.forEach(header => {
-                    header.addEventListener('click', () => {
-                        if (header.classList.contains('active')) {
-                            const lessonTitle = header.textContent.split('\n')[0].trim();
-                            lessonItem.textContent = lessonTitle;
-                            
-                            // Show this module's breadcrumb
-                            document.querySelectorAll('.breadcrumb-list').forEach(list => {
-                                list.style.display = 'none';
-                            });
-                            breadcrumbList.style.display = 'flex';
-                            
-                            // Update current module and lesson
-                            this.currentModule = moduleId;
-                            this.currentLesson = header.getAttribute('data-lesson');
-                        }
-                    });
-                });
+                this.setupLessonTitleUpdates(lessonHeaders, lessonItem, breadcrumbList, moduleId);
             }
         });
         
@@ -94,6 +78,35 @@ class ModuleNavigator {
         if (header && header.nextElementSibling) {
             header.parentNode.insertBefore(breadcrumbContainer, header.nextElementSibling);
         }
+    }
+
+    setupLessonTitleUpdates(lessonHeaders, lessonItem, breadcrumbList, moduleId) {
+        lessonHeaders.forEach(header => {
+            // Add event handler to update breadcrumb when lesson is opened
+            header.addEventListener('click', () => {
+                if (header.classList.contains('active')) {
+                    const lessonTitle = this.getLessonTitle(header);
+                    lessonItem.textContent = lessonTitle;
+                    
+                    // Show this module's breadcrumb
+                    document.querySelectorAll('.breadcrumb-list').forEach(list => {
+                        list.style.display = 'none';
+                    });
+                    breadcrumbList.style.display = 'flex';
+                    
+                    // Update current module and lesson
+                    this.currentModule = moduleId;
+                    this.currentLesson = header.getAttribute('data-lesson');
+                }
+            });
+        });
+    }
+
+    getLessonTitle(header) {
+        // Extract title text from the header, ignoring the status element
+        const headerText = header.textContent || '';
+        const status = header.querySelector('.status')?.textContent || '';
+        return headerText.replace(status, '').trim();
     }
 
     bindNavigationEvents() {
@@ -123,7 +136,7 @@ class ModuleNavigator {
         if (!moduleElement) return;
         
         // Check if module is locked
-        const moduleStatus = moduleElement.querySelector('.module-status').textContent;
+        const moduleStatus = moduleElement.querySelector('.module-status')?.textContent;
         if (moduleStatus === 'Locked') {
             if (window.showNotification) {
                 window.showNotification('Please complete the previous modules first.', 'warning');
@@ -142,10 +155,10 @@ class ModuleNavigator {
             
             // Find first lesson that's not locked
             for (let i = 1; i <= 10; i++) {
-                const lessonHeader = document.querySelector(`[data-module="${moduleId}"][data-lesson="${i}"]`);
+                const lessonHeader = moduleElement.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${i}"]`);
                 if (!lessonHeader) break;
                 
-                const status = lessonHeader.querySelector('.status').textContent;
+                const status = lessonHeader.querySelector('.status')?.textContent;
                 if (status !== 'Locked') {
                     firstAccessibleLesson = lessonHeader;
                     break;
@@ -164,9 +177,11 @@ class ModuleNavigator {
                 
                 // Open first accessible lesson
                 firstAccessibleLesson.classList.add('active');
-                firstAccessibleLesson.nextElementSibling.classList.add('active');
+                if (firstAccessibleLesson.nextElementSibling) {
+                    firstAccessibleLesson.nextElementSibling.classList.add('active');
+                }
                 
-                // Trigger click event to update breadcrumbs
+                // Trigger click event to update breadcrumbs (via bubbling)
                 firstAccessibleLesson.click();
             }
         }, 600);
@@ -179,14 +194,16 @@ class ModuleNavigator {
         // Close all accordions
         document.querySelectorAll('.accordion-header').forEach(header => {
             header.classList.remove('active');
-            header.nextElementSibling.classList.remove('active');
+            if (header.nextElementSibling) {
+                header.nextElementSibling.classList.remove('active');
+            }
         });
         
         // Open target lesson
-        const targetHeader = document.querySelector(`[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
+        const targetHeader = document.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
         if (targetHeader) {
             // Check if lesson is accessible
-            const status = targetHeader.querySelector('.status').textContent;
+            const status = targetHeader.querySelector('.status')?.textContent;
             if (status === 'Locked') {
                 if (window.showNotification) {
                     window.showNotification('Please complete the previous lessons first.', 'warning');
@@ -199,14 +216,16 @@ class ModuleNavigator {
             const targetContent = targetHeader.nextElementSibling;
             
             targetHeader.classList.add('active');
-            targetContent.classList.add('active');
+            if (targetContent) {
+                targetContent.classList.add('active');
+            }
             
             // Scroll to the lesson with smooth animation
             setTimeout(() => {
                 targetHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }, 300);
             
-            // Trigger click event to update breadcrumbs
+            // Trigger click event to update breadcrumbs (via bubbling)
             targetHeader.click();
         }
     }
@@ -220,18 +239,18 @@ class ModuleNavigator {
         const moduleContainers = document.querySelectorAll('.module-container');
         moduleContainers.forEach((container, index) => {
             const moduleId = container.id.replace('module', '');
-            const moduleStatus = container.querySelector('.module-status').textContent;
+            const moduleStatus = container.querySelector('.module-status')?.textContent || 'Not Started';
             
             const navItem = document.createElement('div');
             navItem.className = 'quick-nav-item';
             navItem.setAttribute('data-module', moduleId);
             navItem.innerHTML = `
                 <span class="module-number">${moduleId}</span>
-                <span class="module-status-indicator ${moduleStatus.toLowerCase()}"></span>
+                <span class="module-status-indicator ${moduleStatus.toLowerCase().replace(/\s+/g, '-')}"></span>
             `;
             
             // Add tooltip with module title
-            const moduleTitle = container.querySelector('.module-header h3').textContent;
+            const moduleTitle = container.querySelector('.module-header h3')?.textContent || `Module ${moduleId}`;
             navItem.setAttribute('title', moduleTitle);
             
             // Add click event
@@ -249,5 +268,10 @@ class ModuleNavigator {
 
 // Initialize the module navigator when the document is ready
 document.addEventListener('DOMContentLoaded', () => {
-    window.moduleNavigator = new ModuleNavigator();
+    // Wait a moment to ensure other components have initialized
+    setTimeout(() => {
+        if (!window.moduleNavigator) {
+            window.moduleNavigator = new ModuleNavigator();
+        }
+    }, 100);
 });
