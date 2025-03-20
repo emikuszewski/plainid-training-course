@@ -17,16 +17,22 @@ class QuizManager {
     }
 
     init() {
-        this.setupQuizzes();
-        this.bindEvents();
+        // Only initialize if quiz elements exist
+        if (this.quizElements.length > 0) {
+            this.setupQuizzes();
+            this.bindEvents();
+        }
     }
 
     setupQuizzes() {
         this.quizElements.forEach(quizContainer => {
             // Find all questions in this quiz
             const questions = quizContainer.querySelectorAll('.quiz-question');
-            const moduleId = questions.length > 0 ? questions[0].getAttribute('data-module') : null;
-            const lessonId = questions.length > 0 ? questions[0].getAttribute('data-lesson') : null;
+            
+            if (questions.length === 0) return;
+            
+            const moduleId = questions[0].getAttribute('data-module');
+            const lessonId = questions[0].getAttribute('data-lesson');
             
             if (!moduleId || !lessonId) return;
             
@@ -44,19 +50,24 @@ class QuizManager {
                 };
             }
             
-            // Add progress indicator to the quiz
-            const progressContainer = document.createElement('div');
-            progressContainer.className = 'quiz-progress';
-            progressContainer.innerHTML = `
-                <div class="quiz-progress-text">Question <span class="current-question">1</span>/<span class="total-questions">${questions.length}</span></div>
-                <div class="quiz-progress-bar">
-                    <div class="quiz-progress-fill" style="width: ${(1 / questions.length) * 100}%"></div>
-                </div>
-            `;
-            
-            // Insert progress at the beginning of the quiz
+            // Add progress indicator to the quiz if there's more than one question
             if (questions.length > 1) {
-                quizContainer.insertBefore(progressContainer, quizContainer.firstChild);
+                let progressContainer = quizContainer.querySelector('.quiz-progress');
+                
+                // Create progress indicator if it doesn't exist
+                if (!progressContainer) {
+                    progressContainer = document.createElement('div');
+                    progressContainer.className = 'quiz-progress';
+                    progressContainer.innerHTML = `
+                        <div class="quiz-progress-text">Question <span class="current-question">1</span>/<span class="total-questions">${questions.length}</span></div>
+                        <div class="quiz-progress-bar">
+                            <div class="quiz-progress-fill" style="width: ${(1 / questions.length) * 100}%"></div>
+                        </div>
+                    `;
+                    
+                    // Insert progress at the beginning of the quiz
+                    quizContainer.insertBefore(progressContainer, quizContainer.firstChild);
+                }
                 
                 // Hide all questions except the first one
                 questions.forEach((question, index) => {
@@ -66,11 +77,14 @@ class QuizManager {
                 });
             }
             
-            // Add quiz completion status
-            const completionStatus = document.createElement('div');
-            completionStatus.className = 'quiz-completion-status';
-            completionStatus.style.display = 'none';
-            quizContainer.appendChild(completionStatus);
+            // Add quiz completion status container if it doesn't exist
+            let completionStatus = quizContainer.querySelector('.quiz-completion-status');
+            if (!completionStatus) {
+                completionStatus = document.createElement('div');
+                completionStatus.className = 'quiz-completion-status';
+                completionStatus.style.display = 'none';
+                quizContainer.appendChild(completionStatus);
+            }
         });
     }
 
@@ -78,6 +92,12 @@ class QuizManager {
         const quizOptions = document.querySelectorAll('.quiz-option');
         
         quizOptions.forEach(option => {
+            // Skip if already has event listener
+            if (option.getAttribute('data-has-listener') === 'true') return;
+            
+            // Mark as having listener
+            option.setAttribute('data-has-listener', 'true');
+            
             option.addEventListener('click', (e) => this.handleOptionClick(e));
         });
     }
@@ -87,11 +107,15 @@ class QuizManager {
         const questionContainer = option.closest('.quiz-question');
         const quizContainer = option.closest('.quiz-container');
         
-        if (questionContainer.classList.contains('answered')) return;
+        // Skip if question already answered
+        if (!questionContainer || questionContainer.classList.contains('answered')) return;
         
         const moduleId = questionContainer.getAttribute('data-module');
         const lessonId = questionContainer.getAttribute('data-lesson');
         const questionId = questionContainer.getAttribute('data-question');
+        
+        // Only proceed if we have valid module and lesson IDs
+        if (!moduleId || !lessonId) return;
         
         const options = questionContainer.querySelectorAll('.quiz-option');
         const feedback = questionContainer.querySelector('.quiz-feedback');
@@ -109,12 +133,16 @@ class QuizManager {
         
         if (isCorrect) {
             option.classList.add('correct');
-            feedback.textContent = 'Correct! Well done.';
-            feedback.className = 'quiz-feedback correct';
+            if (feedback) {
+                feedback.textContent = 'Correct! Well done.';
+                feedback.className = 'quiz-feedback correct';
+            }
             questionContainer.classList.add('answered');
             
             // Update result tracking
-            this.results[moduleId][lessonId].correct++;
+            if (this.results[moduleId] && this.results[moduleId][lessonId]) {
+                this.results[moduleId][lessonId].correct++;
+            }
             
             // Show the correct answer highlight with animation
             option.classList.add('success-animation');
@@ -129,12 +157,21 @@ class QuizManager {
             
             if (nextQuestion) {
                 // Add next button if not the last question
-                const nextButton = document.createElement('button');
-                nextButton.className = 'btn quiz-next-btn';
-                nextButton.textContent = 'Next Question';
+                let nextButton = questionContainer.querySelector('.quiz-next-btn');
+                if (!nextButton) {
+                    nextButton = document.createElement('button');
+                    nextButton.className = 'btn quiz-next-btn';
+                    nextButton.textContent = 'Next Question';
+                    
+                    // Add button to question container
+                    questionContainer.appendChild(nextButton);
+                }
                 
-                // Add event listener to next button
-                nextButton.addEventListener('click', () => {
+                // Add/update event listener for the next button
+                nextButton.onclick = () => {
+                    // Remove previous click handler to prevent duplicate bindings
+                    nextButton.onclick = null;
+                    
                     // Hide current question
                     questionContainer.style.display = 'none';
                     
@@ -144,7 +181,7 @@ class QuizManager {
                     // Update progress indicator
                     const progressText = quizContainer.querySelector('.current-question');
                     if (progressText) {
-                        progressText.textContent = currentIndex + 2; // +2 because 0-indexed + 1 for next
+                        progressText.textContent = (currentIndex + 2).toString(); // +2 because 0-indexed + 1 for next
                     }
                     
                     // Update progress bar
@@ -153,22 +190,18 @@ class QuizManager {
                         const totalQuestions = questions.length;
                         progressFill.style.width = `${((currentIndex + 2) / totalQuestions) * 100}%`;
                     }
-                });
-                
-                if (feedback.nextElementSibling && feedback.nextElementSibling.classList.contains('quiz-next-btn')) {
-                    feedback.nextElementSibling.remove();
-                }
-                
-                feedback.parentNode.insertBefore(nextButton, feedback.nextElementSibling);
+                };
             } else {
                 // This was the last question - quiz is complete
-                this.results[moduleId][lessonId].completed = true;
+                if (this.results[moduleId] && this.results[moduleId][lessonId]) {
+                    this.results[moduleId][lessonId].completed = true;
+                }
                 
                 // Show completion message
                 const completionStatus = quizContainer.querySelector('.quiz-completion-status');
                 if (completionStatus) {
-                    const correctCount = this.results[moduleId][lessonId].correct;
-                    const totalCount = this.results[moduleId][lessonId].total;
+                    const correctCount = this.results[moduleId]?.[lessonId]?.correct || 0;
+                    const totalCount = questions.length;
                     const percentage = Math.round((correctCount / totalCount) * 100);
                     
                     completionStatus.innerHTML = `
@@ -195,11 +228,15 @@ class QuizManager {
         } else {
             // Wrong answer
             option.classList.add('incorrect');
-            feedback.textContent = 'Incorrect. Please try again.';
-            feedback.className = 'quiz-feedback incorrect';
+            if (feedback) {
+                feedback.textContent = 'Incorrect. Please try again.';
+                feedback.className = 'quiz-feedback incorrect';
+            }
             
             // Increment attempts
-            this.results[moduleId][lessonId].attempts++;
+            if (this.results[moduleId] && this.results[moduleId][lessonId]) {
+                this.results[moduleId][lessonId].attempts++;
+            }
             
             // Show the incorrect answer highlight with animation
             option.classList.add('shake-animation');
@@ -210,8 +247,8 @@ class QuizManager {
             // Play error sound
             this.playSound('error');
             
-            // Show the correct answer after 2 wrong attempts
-            if (this.results[moduleId][lessonId].attempts >= 2) {
+            // Show hint after multiple wrong attempts
+            if (this.results[moduleId]?.[lessonId]?.attempts >= 2) {
                 // Highlight the correct answer
                 options.forEach(opt => {
                     if (opt.getAttribute('data-correct') === 'true') {
@@ -222,28 +259,61 @@ class QuizManager {
                     }
                 });
                 
-                feedback.textContent = 'Hint: Look for the highlighted option.';
+                if (feedback) {
+                    feedback.textContent = 'Hint: Look for the highlighted option.';
+                }
             }
         }
     }
 
     markLessonComplete(moduleId, lessonId) {
-        // This is a simplified version - in the full implementation
-        // this would call the progress tracking system
-        if (window.markLessonComplete) {
+        // Call the global lesson completion function if available
+        if (typeof window.markLessonComplete === 'function') {
             window.markLessonComplete(moduleId, lessonId);
-        } else {
-            console.log(`Lesson ${lessonId} in Module ${moduleId} completed`);
-            
-            // Update UI elements directly
-            const lessonHeader = document.querySelector(`[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
-            if (lessonHeader) {
-                const statusElement = lessonHeader.querySelector('.status');
-                if (statusElement) {
-                    statusElement.textContent = 'Completed';
-                    statusElement.className = 'status completed';
-                }
+            return;
+        }
+        
+        // Fallback implementation if the global function isn't available
+        console.log(`Lesson ${lessonId} in Module ${moduleId} completed`);
+        
+        // Update UI elements directly
+        const lessonHeader = document.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
+        if (lessonHeader) {
+            const statusElement = lessonHeader.querySelector('.status');
+            if (statusElement) {
+                statusElement.textContent = 'Completed';
+                statusElement.className = 'status completed';
             }
+        }
+        
+        // Try to save progress to localStorage as fallback
+        try {
+            // Check if progress data exists
+            let progress = {};
+            const storedProgress = localStorage.getItem('plainidCourseProgress');
+            if (storedProgress) {
+                progress = JSON.parse(storedProgress);
+            }
+            
+            // Ensure the necessary structure exists
+            if (!progress.modules) {
+                progress.modules = {};
+            }
+            
+            if (!progress.modules[moduleId]) {
+                progress.modules[moduleId] = {
+                    completed: false,
+                    lessons: {}
+                };
+            }
+            
+            // Mark lesson as complete
+            progress.modules[moduleId].lessons[lessonId] = true;
+            
+            // Save progress
+            localStorage.setItem('plainidCourseProgress', JSON.stringify(progress));
+        } catch (e) {
+            console.error('Error saving lesson completion:', e);
         }
     }
 
@@ -259,9 +329,11 @@ class QuizManager {
                 sound = new Audio('data:audio/mp3;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA/+M4wAAAAAAAAAAAAEluZm8AAAAPAAAAAwAAAabIyMjIyMjIyMjIyMjIyMjIyMjI5ubm5ubm5ubm5ubm5ubm5ubm////////////////////////////////////////8AAAA5MYXZjNTguMTM0LjEwMAAAAAAAAAAAAAAA/+MYxAAAAANIAAAAAExBTUUzLjEwMFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxDsAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxHYAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV/+MYxLEAAANIAAAAAFVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV');
             }
             
+            // Set lower volume
             sound.volume = 0.2;
+            
+            // Play with error handling (browsers may block autoplay)
             sound.play().catch(e => {
-                // Silent error - browser might block autoplay
                 console.log('Audio playback was prevented by the browser');
             });
         } catch (e) {
@@ -272,5 +344,10 @@ class QuizManager {
 
 // Initialize the Quiz Manager when the document is ready
 document.addEventListener('DOMContentLoaded', () => {
-    window.quizManager = new QuizManager();
+    // Wait a moment to ensure other components have initialized
+    setTimeout(() => {
+        if (!window.quizManager) {
+            window.quizManager = new QuizManager();
+        }
+    }, 100);
 });
