@@ -218,6 +218,13 @@ class QuizManager {
                     `;
                     completionStatus.style.display = 'block';
                     
+                    // Add continue button
+                    const continueButton = document.createElement('button');
+                    continueButton.className = 'btn continue-button';
+                    continueButton.textContent = 'Continue to Next Lesson';
+                    continueButton.addEventListener('click', () => this.navigateToNextLesson(moduleId, lessonId));
+                    completionStatus.appendChild(continueButton);
+                    
                     // Animate completion
                     completionStatus.classList.add('slide-in-animation');
                     
@@ -261,6 +268,98 @@ class QuizManager {
                 
                 if (feedback) {
                     feedback.textContent = 'Hint: Look for the highlighted option.';
+                }
+            }
+        }
+    }
+
+    navigateToNextLesson(moduleId, lessonId) {
+        // Get the current lesson header
+        const currentHeader = document.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
+        if (!currentHeader) return;
+        
+        // Get all headers in this module
+        const module = document.getElementById(`module${moduleId}`);
+        if (!module) return;
+        
+        const headers = Array.from(module.querySelectorAll('.accordion-header'));
+        const currentIndex = headers.indexOf(currentHeader);
+        
+        if (currentIndex >= 0 && currentIndex < headers.length - 1) {
+            // There's another lesson in this module
+            const nextHeader = headers[currentIndex + 1];
+            
+            // Close current lesson
+            currentHeader.classList.remove('active');
+            const currentContent = currentHeader.nextElementSibling;
+            if (currentContent) {
+                currentContent.classList.remove('active');
+            }
+            
+            // Open next lesson
+            nextHeader.classList.add('active');
+            const nextContent = nextHeader.nextElementSibling;
+            if (nextContent) {
+                nextContent.classList.add('active');
+            }
+            
+            // Scroll to next lesson
+            nextHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        } else {
+            // This was the last lesson in the module
+            // Try to navigate to next module
+            const nextModuleId = parseInt(moduleId) + 1;
+            const nextModule = document.getElementById(`module${nextModuleId}`);
+            
+            if (nextModule) {
+                // Check if the next module is locked
+                const moduleStatus = nextModule.querySelector('.module-status')?.textContent;
+                if (moduleStatus === 'Locked') {
+                    if (window.showNotification) {
+                        window.showNotification('Next module is locked. Complete the current module first.', 'warning');
+                    } else {
+                        alert('Next module is locked. Complete the current module first.');
+                    }
+                    return;
+                }
+                
+                // Close current lesson
+                currentHeader.classList.remove('active');
+                const currentContent = currentHeader.nextElementSibling;
+                if (currentContent) {
+                    currentContent.classList.remove('active');
+                }
+                
+                // Scroll to next module
+                nextModule.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                // Open first lesson in next module, if available
+                const firstHeader = nextModule.querySelector('.accordion-header');
+                if (firstHeader) {
+                    firstHeader.classList.add('active');
+                    const firstContent = firstHeader.nextElementSibling;
+                    if (firstContent) {
+                        firstContent.classList.add('active');
+                    }
+                }
+                
+                // Notification
+                if (window.showNotification) {
+                    const moduleName = nextModule.querySelector('.module-header h3')?.textContent || `Module ${nextModuleId}`;
+                    window.showNotification(`Moving to ${moduleName}`, 'info');
+                }
+            } else {
+                // No more modules
+                if (window.showNotification) {
+                    window.showNotification('Congratulations! You have completed all the modules.', 'success');
+                } else {
+                    alert('Congratulations! You have completed all the modules.');
+                }
+                
+                // Scroll to certification section, if available
+                const certSection = document.getElementById('certification');
+                if (certSection) {
+                    certSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             }
         }
@@ -310,10 +409,67 @@ class QuizManager {
             // Mark lesson as complete
             progress.modules[moduleId].lessons[lessonId] = true;
             
+            // Check if all lessons in the module are complete
+            const moduleElement = document.getElementById(`module${moduleId}`);
+            if (moduleElement) {
+                const lessonHeaders = moduleElement.querySelectorAll('.accordion-header');
+                let allCompleted = true;
+                
+                lessonHeaders.forEach(header => {
+                    const lId = header.getAttribute('data-lesson');
+                    if (lId && !progress.modules[moduleId].lessons[lId]) {
+                        allCompleted = false;
+                    }
+                });
+                
+                if (allCompleted && lessonHeaders.length > 0) {
+                    progress.modules[moduleId].completed = true;
+                    
+                    // Update module status in UI
+                    const moduleStatus = moduleElement.querySelector('.module-status');
+                    if (moduleStatus) {
+                        moduleStatus.textContent = 'Completed';
+                        moduleStatus.className = 'module-status completed';
+                    }
+                    
+                    // Unlock next module
+                    this.unlockNextModule(parseInt(moduleId));
+                }
+            }
+            
             // Save progress
             localStorage.setItem('plainidCourseProgress', JSON.stringify(progress));
         } catch (e) {
             console.error('Error saving lesson completion:', e);
+        }
+    }
+    
+    unlockNextModule(completedModuleId) {
+        const nextModuleId = completedModuleId + 1;
+        const nextModuleElement = document.getElementById(`module${nextModuleId}`);
+        
+        if (nextModuleElement) {
+            const moduleStatus = nextModuleElement.querySelector('.module-status');
+            if (moduleStatus && moduleStatus.textContent === 'Locked') {
+                moduleStatus.textContent = 'Not Started';
+                moduleStatus.className = 'module-status';
+                
+                // Unlock first lesson
+                const firstLessonHeader = nextModuleElement.querySelector('.accordion-header');
+                if (firstLessonHeader) {
+                    const statusElement = firstLessonHeader.querySelector('.status');
+                    if (statusElement) {
+                        statusElement.textContent = 'Start';
+                        statusElement.className = 'status';
+                    }
+                }
+                
+                // Show notification
+                if (window.showNotification) {
+                    const moduleTitle = nextModuleElement.querySelector('.module-header h3')?.textContent || `Module ${nextModuleId}`;
+                    window.showNotification(`New module available: ${moduleTitle}`, 'info');
+                }
+            }
         }
     }
 
@@ -349,5 +505,5 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!window.quizManager) {
             window.quizManager = new QuizManager();
         }
-    }, 100);
+    }, 300);
 });
