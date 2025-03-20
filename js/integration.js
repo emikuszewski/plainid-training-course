@@ -56,14 +56,14 @@ const PlainIDCourse = {
         // Setup shared methods
         this.setupSharedMethods();
         
-        // Initialize components in the correct order to manage dependencies
+        // Initialize default behaviors first (ensure core functionality)
+        this.initializeDefaultBehaviors();
+        
+        // Then initialize components in the correct order to manage dependencies
         this.initializeComponents();
         
         // Set up event listeners for cross-component communication
         this.setupEventListeners();
-        
-        // Initialize default behaviors if needed components are missing
-        this.initializeDefaultBehaviors();
         
         // Mark as initialized
         this.state.initialized = true;
@@ -321,7 +321,7 @@ const PlainIDCourse = {
         this.state.userProgress.modules[moduleId].lessons[lessonId] = true;
         
         // Update UI elements
-        const lessonHeader = document.querySelector(`[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
+        const lessonHeader = document.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
         if (lessonHeader) {
             const statusElement = lessonHeader.querySelector('.status');
             if (statusElement) {
@@ -472,17 +472,19 @@ const PlainIDCourse = {
     
     // Initialize default behaviors for core functionality
     initializeDefaultBehaviors: function() {
-        // Check which components are missing and initialize fallbacks
-        if (!this.components.quizManager) {
-            this.initializeQuizzes();
-        }
+        // These are the essential functions that must work even if component modules fail
         
-        if (!this.components.moduleNavigator) {
-            this.initializeAccordions();
-        }
+        // Initialize accordions (critical functionality)
+        this.initializeAccordions();
         
-        // Initialize tabs if not already done
+        // Initialize tabs
         this.initializeTabs();
+        
+        // Initialize quiz system
+        this.initializeQuizzes();
+        
+        // Initialize progress system
+        this.initializeProgressSystem();
         
         // Update UI based on current progress
         this.updateProgressUI();
@@ -493,13 +495,13 @@ const PlainIDCourse = {
         const accordionHeaders = document.querySelectorAll('.accordion-header');
         
         accordionHeaders.forEach(header => {
+            // Avoid adding duplicate event listeners
+            if (header.hasAttribute('data-has-listener')) return;
+            
+            // Mark as having listener
+            header.setAttribute('data-has-listener', 'true');
+            
             header.addEventListener('click', function() {
-                // Skip if already has event listener
-                if (this.hasAttribute('data-has-listener')) return;
-                
-                // Mark as having listener
-                this.setAttribute('data-has-listener', 'true');
-                
                 // Check if the lesson is locked
                 const status = this.querySelector('.status')?.textContent;
                 if (status === 'Locked') {
@@ -517,13 +519,17 @@ const PlainIDCourse = {
                 accordionHeaders.forEach(h => {
                     if (h !== this && h.classList.contains('active')) {
                         h.classList.remove('active');
-                        h.nextElementSibling.classList.remove('active');
+                        if (h.nextElementSibling) {
+                            h.nextElementSibling.classList.remove('active');
+                        }
                     }
                 });
                 
                 // Toggle current accordion
                 this.classList.toggle('active');
-                content.classList.toggle('active');
+                if (content) {
+                    content.classList.toggle('active');
+                }
                 
                 // Scroll into view if opened
                 if (this.classList.contains('active')) {
@@ -546,7 +552,7 @@ const PlainIDCourse = {
         const tabs = document.querySelectorAll('.tab');
         
         tabs.forEach(tab => {
-            // Skip if already has event listener
+            // Avoid adding duplicate event listeners
             if (tab.hasAttribute('data-has-listener')) return;
             
             // Mark as having listener
@@ -565,7 +571,10 @@ const PlainIDCourse = {
                 
                 // Activate selected tab and content
                 this.classList.add('active');
-                document.getElementById(`${tabId}-content`).classList.add('active');
+                const targetContent = document.getElementById(`${tabId}-content`);
+                if (targetContent) {
+                    targetContent.classList.add('active');
+                }
             });
         });
     },
@@ -575,7 +584,7 @@ const PlainIDCourse = {
         const quizOptions = document.querySelectorAll('.quiz-option');
         
         quizOptions.forEach(option => {
-            // Skip if already has event listener
+            // Avoid adding duplicate event listeners
             if (option.hasAttribute('data-has-listener')) return;
             
             // Mark as having listener
@@ -628,6 +637,25 @@ const PlainIDCourse = {
         });
     },
     
+    // Initialize progress tracking system
+    initializeProgressSystem: function() {
+        // Load saved progress
+        try {
+            const savedProgress = localStorage.getItem('plainidCourseProgress');
+            if (savedProgress) {
+                const loadedProgress = JSON.parse(savedProgress);
+                
+                // Merge with default structure
+                this.state.userProgress = {
+                    ...this.state.userProgress,
+                    ...loadedProgress
+                };
+            }
+        } catch (e) {
+            console.error('Error loading progress:', e);
+        }
+    },
+    
     // Update UI elements based on loaded progress
     updateProgressUI: function() {
         // Update lesson statuses
@@ -652,7 +680,7 @@ const PlainIDCourse = {
                 for (const lessonId in module.lessons) {
                     if (module.lessons[lessonId]) {
                         // Find and update lesson status
-                        const lessonHeader = document.querySelector(`[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
+                        const lessonHeader = moduleElement.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
                         if (lessonHeader) {
                             const statusElement = lessonHeader.querySelector('.status');
                             if (statusElement) {
