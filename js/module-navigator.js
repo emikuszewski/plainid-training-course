@@ -18,6 +18,8 @@ class ModuleNavigator {
         this.addBreadcrumbs();
         this.bindNavigationEvents();
         this.initModuleScroller();
+        this.addProgressIndicators();
+        this.addNextLessonButtons();
     }
 
     addBreadcrumbs() {
@@ -264,6 +266,296 @@ class ModuleNavigator {
         // Add to document
         document.body.appendChild(nav);
     }
+    
+    addProgressIndicators() {
+        // Add progress indicator to each module header
+        document.querySelectorAll('.module-container').forEach(moduleElement => {
+            const moduleId = moduleElement.id.replace('module', '');
+            const moduleHeader = moduleElement.querySelector('.module-header');
+            
+            if (moduleHeader && !moduleHeader.querySelector('.module-progress-indicator')) {
+                // Create progress indicator
+                const progressIndicator = document.createElement('div');
+                progressIndicator.className = 'module-progress-indicator';
+                progressIndicator.innerHTML = `
+                    <div class="module-progress-bar">
+                        <div class="module-progress-fill" data-module="${moduleId}" style="width: 0%"></div>
+                    </div>
+                    <span class="module-progress-text">0%</span>
+                `;
+                
+                // Add to module header
+                moduleHeader.appendChild(progressIndicator);
+                
+                // Add styles if needed
+                this.addProgressStyles();
+            }
+        });
+        
+        // Update progress indicators
+        this.updateProgressIndicators();
+    }
+    
+    addProgressStyles() {
+        if (document.getElementById('module-progress-styles')) {
+            return;
+        }
+        
+        const style = document.createElement('style');
+        style.id = 'module-progress-styles';
+        style.textContent = `
+            .module-progress-indicator {
+                display: flex;
+                align-items: center;
+                margin-left: 15px;
+                gap: 8px;
+            }
+            
+            .module-progress-bar {
+                width: 100px;
+                height: 6px;
+                background-color: #e0e0e0;
+                border-radius: 3px;
+                overflow: hidden;
+            }
+            
+            .module-progress-fill {
+                height: 100%;
+                background-color: var(--primary);
+                width: 0%;
+                transition: width 0.5s ease;
+            }
+            
+            .module-progress-text {
+                font-size: 0.8rem;
+                color: #666;
+                min-width: 32px;
+            }
+            
+            .module-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+            
+            .status {
+                white-space: nowrap;
+            }
+            
+            /* Add next module guidance */
+            .next-module-guidance {
+                margin: 20px 0;
+                padding: 15px;
+                background-color: #e8f5e9;
+                border-left: 4px solid #4caf50;
+                border-radius: 4px;
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+            }
+            
+            .next-module-guidance p {
+                margin: 0;
+                flex: 1;
+            }
+            
+            /* Continue button in completed lessons */
+            .continue-button {
+                margin-top: 20px;
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+            }
+            
+            .continue-button::after {
+                content: '';
+                display: inline-block;
+                width: 18px;
+                height: 18px;
+                background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ffffff'%3E%3Cpath d='M12,4L10.59,5.41L16.17,11H4V13H16.17L10.59,18.59L12,20L20,12L12,4Z'/%3E%3C/svg%3E");
+                background-size: contain;
+                background-repeat: no-repeat;
+                transition: transform 0.3s ease;
+            }
+            
+            .continue-button:hover::after {
+                transform: translateX(3px);
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    updateProgressIndicators() {
+        document.querySelectorAll('.module-container').forEach(moduleElement => {
+            const moduleId = moduleElement.id.replace('module', '');
+            const progressFill = moduleElement.querySelector(`.module-progress-fill[data-module="${moduleId}"]`);
+            const progressText = moduleElement.querySelector('.module-progress-text');
+            
+            if (!progressFill || !progressText) return;
+            
+            // Calculate progress for this module
+            const progress = this.calculateModuleProgress(moduleId);
+            
+            // Update UI
+            progressFill.style.width = `${progress}%`;
+            progressText.textContent = `${Math.round(progress)}%`;
+        });
+    }
+    
+    calculateModuleProgress(moduleId) {
+        const moduleElement = document.getElementById(`module${moduleId}`);
+        if (!moduleElement) return 0;
+        
+        const lessonHeaders = moduleElement.querySelectorAll('.accordion-header');
+        if (lessonHeaders.length === 0) return 0;
+        
+        let totalLessons = 0;
+        let completedLessons = 0;
+        
+        lessonHeaders.forEach(header => {
+            const lessonId = header.getAttribute('data-lesson');
+            if (lessonId) {
+                totalLessons++;
+                
+                // Check if lesson is completed by looking at the status
+                const status = header.querySelector('.status')?.textContent;
+                if (status === 'Completed') {
+                    completedLessons++;
+                } else {
+                    // Also check progress data in localStorage as a backup
+                    try {
+                        const progress = JSON.parse(localStorage.getItem('plainidCourseProgress')) || {};
+                        if (progress.modules && 
+                            progress.modules[moduleId] && 
+                            progress.modules[moduleId].lessons && 
+                            progress.modules[moduleId].lessons[lessonId]) {
+                            completedLessons++;
+                        }
+                    } catch (e) {
+                        // Ignore localStorage errors
+                    }
+                }
+            }
+        });
+        
+        return totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
+    }
+    
+    addNextLessonButtons() {
+        // Add "Continue to Next Lesson" buttons to all completed lessons
+        document.querySelectorAll('.accordion-content').forEach(content => {
+            // Skip if button already exists
+            if (content.querySelector('.continue-button')) return;
+            
+            // Check if parent header has a status of "Completed"
+            const header = content.previousElementSibling;
+            if (!header || !header.classList.contains('accordion-header')) return;
+            
+            const status = header.querySelector('.status')?.textContent;
+            if (status !== 'Completed') return;
+            
+            // Add continue button
+            const continueButton = document.createElement('button');
+            continueButton.className = 'btn continue-button';
+            continueButton.textContent = 'Continue to Next Lesson';
+            continueButton.addEventListener('click', () => this.navigateToNextContent(header));
+            
+            // Add at the end of the content
+            content.appendChild(continueButton);
+        });
+        
+        // Also add to quiz completion statuses
+        document.querySelectorAll('.quiz-completion-status').forEach(statusElement => {
+            if (!statusElement.querySelector('.continue-button')) {
+                const continueButton = document.createElement('button');
+                continueButton.className = 'btn continue-button';
+                continueButton.textContent = 'Continue to Next Lesson';
+                
+                // Find the current lesson header
+                const quizContainer = statusElement.closest('.quiz-container');
+                if (!quizContainer) return;
+                
+                const content = quizContainer.closest('.accordion-content');
+                if (!content) return;
+                
+                const header = content.previousElementSibling;
+                if (!header || !header.classList.contains('accordion-header')) return;
+                
+                continueButton.addEventListener('click', () => this.navigateToNextContent(header));
+                statusElement.appendChild(continueButton);
+            }
+        });
+    }
+    
+    navigateToNextContent(currentHeader) {
+        if (!currentHeader) return;
+        
+        const moduleId = currentHeader.getAttribute('data-module');
+        const lessonId = currentHeader.getAttribute('data-lesson');
+        
+        if (!moduleId || !lessonId) return;
+        
+        // Find all lesson headers in this module
+        const module = document.getElementById(`module${moduleId}`);
+        const headers = Array.from(module.querySelectorAll('.accordion-header'));
+        
+        // Find current header index
+        const currentIndex = headers.findIndex(h => h === currentHeader);
+        
+        if (currentIndex >= 0 && currentIndex < headers.length - 1) {
+            // There's another lesson in this module
+            const nextHeader = headers[currentIndex + 1];
+            
+            // Check if it's locked
+            const nextStatus = nextHeader.querySelector('.status')?.textContent;
+            if (nextStatus === 'Locked') {
+                if (window.showNotification) {
+                    window.showNotification('Please complete lessons in order. The next lesson is locked.', 'warning');
+                } else {
+                    alert('Please complete lessons in order. The next lesson is locked.');
+                }
+                return;
+            }
+            
+            // Navigate to next lesson
+            this.navigateToLesson(moduleId, nextHeader.getAttribute('data-lesson'));
+        } else {
+            // We're at the last lesson in the module
+            // Try to navigate to the next module
+            const nextModuleId = parseInt(moduleId) + 1;
+            const nextModule = document.getElementById(`module${nextModuleId}`);
+            
+            if (!nextModule) {
+                // No more modules, show completion message
+                if (window.showNotification) {
+                    window.showNotification('You have completed all available modules! Check out the certification section.', 'success');
+                } else {
+                    alert('You have completed all available modules! Check out the certification section.');
+                }
+                
+                // Navigate to certification section
+                const certSection = document.getElementById('certification');
+                if (certSection) {
+                    certSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
+                return;
+            }
+            
+            // Check if next module is locked
+            const nextModuleStatus = nextModule.querySelector('.module-status')?.textContent;
+            if (nextModuleStatus === 'Locked') {
+                if (window.showNotification) {
+                    window.showNotification('The next module is locked. Please complete all lessons in the current module.', 'warning');
+                } else {
+                    alert('The next module is locked. Please complete all lessons in the current module.');
+                }
+                return;
+            }
+            
+            // Navigate to the next module
+            this.navigateToModule(nextModuleId);
+        }
+    }
 }
 
 // Initialize the module navigator when the document is ready
@@ -273,5 +565,5 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!window.moduleNavigator) {
             window.moduleNavigator = new ModuleNavigator();
         }
-    }, 100);
+    }, 300);
 });
