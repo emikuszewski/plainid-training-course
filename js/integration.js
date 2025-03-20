@@ -6,6 +6,8 @@
  * 2. Establishing consistent data structures 
  * 3. Creating proper event communication
  * 4. Resolving DOM manipulation conflicts
+ * 
+ * UPDATED: Fixed module progression issues
  */
 
 // Main namespace for the application
@@ -276,6 +278,9 @@ const PlainIDCourse = {
             
             // Show notification
             window.showNotification(`Module ${moduleId} completed!`, 'success');
+            
+            // IMPORTANT: Explicitly update module availability to unlock the next module
+            this.updateModuleAvailability();
         });
         
         // Listen for profile updates
@@ -714,42 +719,63 @@ const PlainIDCourse = {
         
         // First pass: count completed modules
         let completedModules = 0;
+        let lastCompletedModuleId = 0;
+        
         for (let i = 1; i <= modules.length; i++) {
             if (this.state.userProgress.modules[i]?.completed) {
                 completedModules++;
+                lastCompletedModuleId = i;
             }
         }
         
-        // Basic rule: You can access a module if previous module is complete
-        // Module 1 is always available
-        // Other modules require previous module to be at least started
+        // Second pass: update module availability
         modules.forEach((moduleElement, index) => {
             const moduleId = moduleElement.id.replace('module', '');
             const moduleStatus = moduleElement.querySelector('.module-status');
             
-            // Skip first module (always available)
-            if (moduleId === '1') return;
+            // Skip already completed or in-progress modules
+            if (moduleStatus && (moduleStatus.textContent === 'Completed' || moduleStatus.textContent === 'In Progress')) {
+                return;
+            }
             
-            // Check if previous module is at least started
+            // Module 1 is always available
+            if (moduleId === '1') {
+                if (moduleStatus && moduleStatus.textContent === 'Locked') {
+                    moduleStatus.textContent = 'Not Started';
+                    moduleStatus.className = 'module-status';
+                    
+                    // Unlock first lesson
+                    const firstLessonHeader = moduleElement.querySelector('.accordion-header');
+                    if (firstLessonHeader) {
+                        const statusElement = firstLessonHeader.querySelector('.status');
+                        if (statusElement) {
+                            statusElement.textContent = 'Start';
+                            statusElement.className = 'status';
+                        }
+                    }
+                }
+                return;
+            }
+            
+            // Check if previous module is at least partially completed
             const prevModuleId = parseInt(moduleId) - 1;
             const prevModuleStarted = this.state.userProgress.modules[prevModuleId] && 
-                                     Object.keys(this.state.userProgress.modules[prevModuleId].lessons).length > 0;
+                                     Object.keys(this.state.userProgress.modules[prevModuleId].lessons || {}).length > 0;
             
-            if (!prevModuleStarted && moduleStatus && moduleStatus.textContent === 'Locked') {
-                // Keep it locked
-                return;
-            } else if (moduleStatus && moduleStatus.textContent === 'Locked') {
-                // Unlock the module
-                moduleStatus.textContent = 'Not Started';
-                moduleStatus.className = 'module-status';
-                
-                // Unlock first lesson
-                const firstLessonHeader = moduleElement.querySelector('.accordion-header');
-                if (firstLessonHeader) {
-                    const statusElement = firstLessonHeader.querySelector('.status');
-                    if (statusElement) {
-                        statusElement.textContent = 'Start';
-                        statusElement.className = 'status';
+            // Unlock if previous module is completed or at least started
+            if (prevModuleStarted || parseInt(moduleId) === lastCompletedModuleId + 1) {
+                if (moduleStatus && moduleStatus.textContent === 'Locked') {
+                    moduleStatus.textContent = 'Not Started';
+                    moduleStatus.className = 'module-status';
+                    
+                    // Unlock first lesson
+                    const firstLessonHeader = moduleElement.querySelector('.accordion-header');
+                    if (firstLessonHeader) {
+                        const statusElement = firstLessonHeader.querySelector('.status');
+                        if (statusElement) {
+                            statusElement.textContent = 'Start';
+                            statusElement.className = 'status';
+                        }
                     }
                 }
             }
