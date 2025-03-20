@@ -305,6 +305,13 @@ class QuizManager {
             
             // Scroll to next lesson
             nextHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            // FIX: If next lesson is locked, unlock it
+            const statusElement = nextHeader.querySelector('.status');
+            if (statusElement && statusElement.textContent === 'Locked') {
+                statusElement.textContent = 'Start';
+                statusElement.className = 'status';
+            }
         } else {
             // This was the last lesson in the module
             // Try to navigate to next module
@@ -313,14 +320,17 @@ class QuizManager {
             
             if (nextModule) {
                 // Check if the next module is locked
-                const moduleStatus = nextModule.querySelector('.module-status')?.textContent;
-                if (moduleStatus === 'Locked') {
+                const moduleStatus = nextModule.querySelector('.module-status');
+                if (moduleStatus && moduleStatus.textContent === 'Locked') {
+                    // FIX: Automatically unlock next module when completing the last lesson of current module
+                    moduleStatus.textContent = 'Not Started';
+                    moduleStatus.className = 'module-status';
+                    
                     if (window.showNotification) {
-                        window.showNotification('Next module is locked. Complete the current module first.', 'warning');
+                        window.showNotification(`Module ${nextModuleId} has been unlocked!`, 'success');
                     } else {
-                        alert('Next module is locked. Complete the current module first.');
+                        alert(`Module ${nextModuleId} has been unlocked!`);
                     }
-                    return;
                 }
                 
                 // Close current lesson
@@ -340,6 +350,13 @@ class QuizManager {
                     const firstContent = firstHeader.nextElementSibling;
                     if (firstContent) {
                         firstContent.classList.add('active');
+                    }
+                    
+                    // FIX: Make sure first lesson is unlocked
+                    const firstStatusElement = firstHeader.querySelector('.status');
+                    if (firstStatusElement && firstStatusElement.textContent === 'Locked') {
+                        firstStatusElement.textContent = 'Start';
+                        firstStatusElement.className = 'status';
                     }
                 }
                 
@@ -450,7 +467,7 @@ class QuizManager {
         
         if (nextModuleElement) {
             const moduleStatus = nextModuleElement.querySelector('.module-status');
-            if (moduleStatus && moduleStatus.textContent === 'Locked') {
+            if (moduleStatus && (moduleStatus.textContent === 'Locked' || moduleStatus.textContent === 'Not Started')) {
                 moduleStatus.textContent = 'Not Started';
                 moduleStatus.className = 'module-status';
                 
