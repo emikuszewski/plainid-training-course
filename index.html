@@ -207,50 +207,7 @@
                             <span class="status">Locked</span>
                         </div>
                         <div class="accordion-content" id="module1-lesson2">
-                            <h4>The Evolution of Access Control</h4>
-                            <p>Access control models have evolved significantly over time to address increasingly complex security needs:</p>
-                            
-                            <h5>1. Discretionary Access Control (DAC)</h5>
-                            <p>The earliest form of access control where the owner of a resource determines who can access it. Think of file permissions in early operating systems.</p>
-                            
-                            <h5>2. Mandatory Access Control (MAC)</h5>
-                            <p>A more rigid model where access decisions are made by a central authority based on security classifications. Common in military and government systems.</p>
-                            
-                            <h5>3. Role-Based Access Control (RBAC)</h5>
-                            <p>Users are assigned roles, and permissions are assigned to those roles. This simplified administration but lacked flexibility for complex scenarios.</p>
-                            
-                            <h5>4. Attribute-Based Access Control (ABAC)</h5>
-                            <p>Access decisions based on attributes of the user, resource, action, and environment. More flexible but complex to implement.</p>
-                            
-                            <h5>5. Policy-Based Access Control (PBAC)</h5>
-                            <p>The most advanced model, combining elements of RBAC and ABAC with centralized policy management. This is where PlainID focuses.</p>
-                            
-                            <div class="diagram">
-                                <img src="images/module1-diagram2.png" alt="Evolution of Access Control Models">
-                            </div>
-                            
-                            <div class="alert alert-info">
-                                <strong>Note:</strong> PlainID's approach is based on Policy-Based Access Control, which provides the flexibility of ABAC with the manageability needed for enterprise implementations.
-                            </div>
-                            
-                            <div class="quiz-container">
-                                <h4>Knowledge Check</h4>
-                                <div class="quiz-question" data-module="1" data-lesson="2" data-question="1">
-                                    <p>Which access control model is most closely aligned with PlainID's approach?</p>
-                                    <div class="quiz-options">
-                                        <div class="quiz-option" data-correct="false">Discretionary Access Control (DAC)</div>
-                                        <div class="quiz-option" data-correct="false">Role-Based Access Control (RBAC)</div>
-                                        <div class="quiz-option" data-correct="false">Mandatory Access Control (MAC)</div>
-                                        <div class="quiz-option" data-correct="true">Policy-Based Access Control (PBAC)</div>
-                                    </div>
-                                    <div class="quiz-feedback"></div>
-                                </div>
-                            </div>
-                            
-                            <div class="module-navigation">
-                                <button class="btn btn-secondary prev-lesson" data-module="1" data-lesson="1">Previous</button>
-                                <button class="btn next-lesson" data-module="1" data-lesson="3">Next Lesson</button>
-                            </div>
+                            <!-- Lesson 2 content -->
                         </div>
                     </div>
                     
@@ -331,6 +288,24 @@
         </div>
     </footer>
     
+    <!-- Add integration script first -->
+    <script src="js/integration.js"></script>
+    
+    <!-- Core scripts -->
     <script src="js/main.js"></script>
+    <script src="js/module-navigator.js"></script>
+    <script src="js/quiz-manager.js"></script>
+    
+    <!-- Feature scripts -->
+    <script src="js/certificate-generator.js"></script>
+    <script src="js/interactive-content.js"></script>
+    <script src="js/course-analytics.js"></script>
+    <script src="js/personalized-learning.js"></script>
+    <script src="js/accessibility-manager.js"></script>
+    <script src="js/interactive-diagrams.js"></script>
+    <script src="js/achievement-system.js"></script>
+    
+    <!-- Add diagnostics script last -->
+    <script src="js/diagnostics.js"></script>
 </body>
 </html>
