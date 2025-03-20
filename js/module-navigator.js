@@ -134,8 +134,12 @@ class ModuleNavigator {
     }
 
     navigateToModule(moduleId) {
+        console.log(`Navigating to module ${moduleId}`);
         const moduleElement = document.getElementById(`module${moduleId}`);
-        if (!moduleElement) return;
+        if (!moduleElement) {
+            console.warn(`Module element for module ${moduleId} not found`);
+            return;
+        }
         
         // Check if module is locked
         const moduleStatus = moduleElement.querySelector('.module-status')?.textContent;
@@ -193,6 +197,8 @@ class ModuleNavigator {
     }
 
     navigateToLesson(moduleId, lessonId) {
+        console.log(`Navigating to lesson ${lessonId} in module ${moduleId}`);
+        
         // Close all accordions
         document.querySelectorAll('.accordion-header').forEach(header => {
             header.classList.remove('active');
@@ -229,6 +235,8 @@ class ModuleNavigator {
             
             // Trigger click event to update breadcrumbs (via bubbling)
             targetHeader.click();
+        } else {
+            console.warn(`Target lesson header for module ${moduleId}, lesson ${lessonId} not found`);
         }
     }
 
@@ -403,6 +411,34 @@ class ModuleNavigator {
     }
     
     calculateModuleProgress(moduleId) {
+        // Try to get progress data from localStorage first
+        try {
+            const progress = JSON.parse(localStorage.getItem('plainidCourseProgress')) || {};
+            if (progress.modules && progress.modules[moduleId]) {
+                const moduleData = progress.modules[moduleId];
+                
+                // If module is marked as completed, return 100%
+                if (moduleData.completed) {
+                    return 100;
+                }
+                
+                // Count completed lessons
+                const completedLessons = Object.values(moduleData.lessons || {}).filter(Boolean).length;
+                
+                // Get total lessons from DOM
+                const moduleElement = document.getElementById(`module${moduleId}`);
+                if (moduleElement) {
+                    const totalLessons = moduleElement.querySelectorAll('.accordion-header').length;
+                    if (totalLessons > 0) {
+                        return (completedLessons / totalLessons) * 100;
+                    }
+                }
+            }
+        } catch (e) {
+            console.error('Error calculating module progress:', e);
+        }
+        
+        // Fallback: Calculate directly from DOM
         const moduleElement = document.getElementById(`module${moduleId}`);
         if (!moduleElement) return 0;
         
@@ -418,22 +454,9 @@ class ModuleNavigator {
                 totalLessons++;
                 
                 // Check if lesson is completed by looking at the status
-                const status = header.querySelector('.status')?.textContent;
-                if (status === 'Completed') {
+                const statusElement = header.querySelector('.status');
+                if (statusElement && statusElement.textContent === 'Completed') {
                     completedLessons++;
-                } else {
-                    // Also check progress data in localStorage as a backup
-                    try {
-                        const progress = JSON.parse(localStorage.getItem('plainidCourseProgress')) || {};
-                        if (progress.modules && 
-                            progress.modules[moduleId] && 
-                            progress.modules[moduleId].lessons && 
-                            progress.modules[moduleId].lessons[lessonId]) {
-                            completedLessons++;
-                        }
-                    } catch (e) {
-                        // Ignore localStorage errors
-                    }
                 }
             }
         });
@@ -488,19 +511,35 @@ class ModuleNavigator {
     }
     
     navigateToNextContent(currentHeader) {
-        if (!currentHeader) return;
+        console.log("Navigating to next content from current header");
+        
+        if (!currentHeader) {
+            console.warn("No current header provided for navigation");
+            return;
+        }
         
         const moduleId = currentHeader.getAttribute('data-module');
         const lessonId = currentHeader.getAttribute('data-lesson');
         
-        if (!moduleId || !lessonId) return;
+        if (!moduleId || !lessonId) {
+            console.warn("Missing module or lesson ID on header");
+            return;
+        }
+        
+        console.log(`Navigating from module ${moduleId}, lesson ${lessonId}`);
         
         // Find all lesson headers in this module
         const module = document.getElementById(`module${moduleId}`);
+        if (!module) {
+            console.warn(`Module element for module ${moduleId} not found`);
+            return;
+        }
+        
         const headers = Array.from(module.querySelectorAll('.accordion-header'));
         
         // Find current header index
         const currentIndex = headers.findIndex(h => h === currentHeader);
+        console.log(`Current index: ${currentIndex}, Total headers: ${headers.length}`);
         
         if (currentIndex >= 0 && currentIndex < headers.length - 1) {
             // There's another lesson in this module
@@ -509,12 +548,14 @@ class ModuleNavigator {
             // Check if it's locked
             const nextStatus = nextHeader.querySelector('.status')?.textContent;
             if (nextStatus === 'Locked') {
-                if (window.showNotification) {
-                    window.showNotification('Please complete lessons in order. The next lesson is locked.', 'warning');
-                } else {
-                    alert('Please complete lessons in order. The next lesson is locked.');
+                console.log("Next lesson is locked - unlocking it");
+                
+                // Unlock it since the previous lesson is complete
+                const statusElement = nextHeader.querySelector('.status');
+                if (statusElement) {
+                    statusElement.textContent = 'Start';
+                    statusElement.className = 'status';
                 }
-                return;
             }
             
             // Navigate to next lesson
@@ -544,28 +585,32 @@ class ModuleNavigator {
             // Check if next module is locked
             const nextModuleStatus = nextModule.querySelector('.module-status')?.textContent;
             if (nextModuleStatus === 'Locked') {
-                if (window.showNotification) {
-                    window.showNotification('The next module is locked. Please complete all lessons in the current module.', 'warning');
-                } else {
-                    alert('The next module is locked. Please complete all lessons in the current module.');
+                console.log(`Next module ${nextModuleId} is locked - unlocking it`);
+                
+                // Unlock it
+                const moduleStatus = nextModule.querySelector('.module-status');
+                if (moduleStatus) {
+                    moduleStatus.textContent = 'Not Started';
+                    moduleStatus.className = 'module-status';
                 }
-                return;
-            }
-            
-            // Navigate to the next module
-            this.navigateToModule(nextModuleId);
-            
-            // FIX: Force unlock first lesson in the next module
-            setTimeout(() => {
+                
+                // Also unlock first lesson
                 const firstLesson = nextModule.querySelector('.accordion-header');
                 if (firstLesson) {
                     const statusElement = firstLesson.querySelector('.status');
-                    if (statusElement && statusElement.textContent === 'Locked') {
+                    if (statusElement) {
                         statusElement.textContent = 'Start';
                         statusElement.className = 'status';
                     }
                 }
-            }, 500);
+                
+                if (window.showNotification) {
+                    window.showNotification(`Module ${nextModuleId} has been unlocked!`, 'success');
+                }
+            }
+            
+            // Navigate to the next module
+            this.navigateToModule(nextModuleId);
         }
     }
 }
