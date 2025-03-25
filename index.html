@@ -288,14 +288,19 @@
         </div>
     </footer>
     
+    <!-- INSTRUCTIONS:
+     Replace the script loading section in your index.html with this updated version
+     that includes the progression fix script BEFORE other scripts -->
+
     <!-- Add integration script first -->
-    <script src="js/integration.js"></script>
-    
+    <script src="js/module-progression-fix.js"></script>
+
     <!-- Core scripts -->
+    <script src="js/integration.js"></script>
     <script src="js/main.js"></script>
     <script src="js/module-navigator.js"></script>
     <script src="js/quiz-manager.js"></script>
-    
+
     <!-- Feature scripts -->
     <script src="js/certificate-generator.js"></script>
     <script src="js/interactive-content.js"></script>
@@ -304,8 +309,6 @@
     <script src="js/accessibility-manager.js"></script>
     <script src="js/interactive-diagrams.js"></script>
     <script src="js/achievement-system.js"></script>
-    
+
     <!-- Add diagnostics script last -->
     <script src="js/diagnostics.js"></script>
-</body>
-</html>
