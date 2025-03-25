@@ -902,7 +902,7 @@ const PlainIDCourse = {
         let completedModules = [];
         let lastCompletedModuleId = 0;
         
-        // FIX: Find the highest completed module ID
+        // Find the highest completed module ID
         for (let moduleId in this.state.userProgress.modules) {
             const moduleData = this.state.userProgress.modules[moduleId];
             const parsedModuleId = parseInt(moduleId);
@@ -957,7 +957,6 @@ const PlainIDCourse = {
             }
             
             // Also handle the case where the next module already has In Progress status but first lesson is locked
-            // This fixes a potential inconsistency
             if (nextModuleElement) {
                 const moduleStatus = nextModuleElement.querySelector('.module-status');
                 if (moduleStatus && 
@@ -1229,6 +1228,67 @@ const PlainIDCourse = {
                 }
             }
         }
+    },
+
+    // Navigate to a specific module
+    navigateToModule: function(moduleId) {
+        console.log(`Navigating to module ${moduleId}`);
+        const moduleElement = document.getElementById(`module${moduleId}`);
+        if (!moduleElement) {
+            console.warn(`Module element for module ${moduleId} not found`);
+            return;
+        }
+            
+        // Check if module is locked - specifically check for 'Locked' text
+        const moduleStatus = moduleElement.querySelector('.module-status')?.textContent;
+        if (moduleStatus === 'Locked') {
+            if (window.showNotification) {
+                window.showNotification('Please complete the previous modules first.', 'warning');
+            } else {
+                alert('Please complete the previous modules first.');
+            }
+            return;
+        }
+            
+        // Smooth scroll to module
+        moduleElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+        // Open first accessible lesson if not already open
+        setTimeout(() => {
+            let firstAccessibleLesson = null;
+                
+            // Find first lesson that's not locked
+            for (let i = 1; i <= 10; i++) {
+                const lessonHeader = moduleElement.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${i}"]`);
+                if (!lessonHeader) break;
+                    
+                const status = lessonHeader.querySelector('.status')?.textContent;
+                if (status !== 'Locked') {
+                    firstAccessibleLesson = lessonHeader;
+                    break;
+                }
+            }
+                
+            if (firstAccessibleLesson && !firstAccessibleLesson.classList.contains('active')) {
+                // Close all accordion contents
+                document.querySelectorAll('.accordion-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                    
+                document.querySelectorAll('.accordion-header').forEach(header => {
+                    header.classList.remove('active');
+                });
+                    
+                // Open first accessible lesson
+                firstAccessibleLesson.classList.add('active');
+                if (firstAccessibleLesson.nextElementSibling) {
+                    firstAccessibleLesson.nextElementSibling.classList.add('active');
+                }
+                    
+                // Trigger click event to update breadcrumbs (via bubbling)
+                firstAccessibleLesson.click();
+            }
+        }, 600);
     }
 };
 
