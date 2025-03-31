@@ -347,15 +347,7 @@ class QuizManager {
                 currentContent.classList.remove('active');
             }
             
-            // Check if next lesson is locked
-            const statusElement = nextHeader.querySelector('.status');
-            if (statusElement && statusElement.textContent === 'Locked') {
-                console.log(`Unlocking next lesson in module ${moduleId}`);
-                statusElement.textContent = 'Start';
-                statusElement.className = 'status';
-            }
-            
-            // Open next lesson
+            // Open next lesson (all lessons are accessible)
             nextHeader.classList.add('active');
             const nextContent = nextHeader.nextElementSibling;
             if (nextContent) {
@@ -373,22 +365,6 @@ class QuizManager {
             if (nextModule) {
                 console.log(`Moving to next module ${nextModuleId}`);
                 
-                // Check if the next module is locked
-                const moduleStatus = nextModule.querySelector('.module-status');
-                if (moduleStatus && moduleStatus.textContent === 'Locked') {
-                    console.log(`Unlocking next module ${nextModuleId}`);
-                    
-                    // Unlock the module
-                    moduleStatus.textContent = 'Not Started';
-                    moduleStatus.className = 'module-status';
-                    
-                    if (window.showNotification) {
-                        window.showNotification(`Module ${nextModuleId} has been unlocked!`, 'success');
-                    } else {
-                        alert(`Module ${nextModuleId} has been unlocked!`);
-                    }
-                }
-                
                 // Close current lesson
                 currentHeader.classList.remove('active');
                 const currentContent = currentHeader.nextElementSibling;
@@ -399,17 +375,9 @@ class QuizManager {
                 // Scroll to next module
                 nextModule.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 
-                // Open first lesson in next module, if available
+                // Open first lesson in next module
                 const firstHeader = nextModule.querySelector('.accordion-header');
                 if (firstHeader) {
-                    // Unlock first lesson if needed
-                    const firstStatusElement = firstHeader.querySelector('.status');
-                    if (firstStatusElement && firstStatusElement.textContent === 'Locked') {
-                        console.log(`Unlocking first lesson in next module ${nextModuleId}`);
-                        firstStatusElement.textContent = 'Start';
-                        firstStatusElement.className = 'status';
-                    }
-                    
                     // Open the lesson
                     firstHeader.classList.add('active');
                     const firstContent = firstHeader.nextElementSibling;
@@ -528,9 +496,6 @@ class QuizManager {
                         moduleStatus.textContent = 'Completed';
                         moduleStatus.className = 'module-status completed';
                     }
-                    
-                    // Unlock next module
-                    this.unlockNextModule(parseInt(moduleId));
                 }
             }
             
@@ -538,39 +503,6 @@ class QuizManager {
             localStorage.setItem('plainidCourseProgress', JSON.stringify(progress));
         } catch (e) {
             console.error('Error saving lesson completion:', e);
-        }
-    }
-    
-    unlockNextModule(completedModuleId) {
-        console.log(`Quiz trying to unlock next module after module ${completedModuleId}`);
-        
-        const nextModuleId = completedModuleId + 1;
-        const nextModuleElement = document.getElementById(`module${nextModuleId}`);
-        
-        if (nextModuleElement) {
-            const moduleStatus = nextModuleElement.querySelector('.module-status');
-            if (moduleStatus && (moduleStatus.textContent === 'Locked' || moduleStatus.textContent === 'Not Started')) {
-                console.log(`Unlocking module ${nextModuleId}`);
-                
-                moduleStatus.textContent = 'Not Started';
-                moduleStatus.className = 'module-status';
-                
-                // Unlock first lesson
-                const firstLessonHeader = nextModuleElement.querySelector('.accordion-header');
-                if (firstLessonHeader) {
-                    const statusElement = firstLessonHeader.querySelector('.status');
-                    if (statusElement) {
-                        statusElement.textContent = 'Start';
-                        statusElement.className = 'status';
-                    }
-                }
-                
-                // Show notification
-                if (window.showNotification) {
-                    const moduleTitle = nextModuleElement.querySelector('.module-header h3')?.textContent || `Module ${nextModuleId}`;
-                    window.showNotification(`New module available: ${moduleTitle}`, 'info');
-                }
-            }
         }
     }
 
