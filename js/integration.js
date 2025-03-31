@@ -69,8 +69,8 @@ const PlainIDCourse = {
         this.state.initialized = true;
         console.log('PlainID Training Course initialized');
         
-        // Add automatic module progression monitor (new)
-        this.setupModuleProgressionMonitor();
+        // Unlock all modules and lessons for open access
+        this.unlockAllModules();
     },
     
     // Load state from localStorage
@@ -279,9 +279,6 @@ const PlainIDCourse = {
             
             // Show notification
             window.showNotification(`Module ${moduleId} completed!`, 'success');
-            
-            // Unlock next module
-            this.updateModuleAvailability();
         });
         
         // Listen for profile updates
@@ -354,46 +351,43 @@ const PlainIDCourse = {
         document.dispatchEvent(new CustomEvent('lesson-completed', {
             detail: { moduleId, lessonId }
         }));
-        
-        // Make sure the next lesson is unlocked
-        this.unlockNextLesson(moduleId, lessonId);
     },
     
-    // Unlock the next lesson after completing the current one
-    unlockNextLesson: function(moduleId, lessonId) {
-        moduleId = moduleId.toString();
-        lessonId = lessonId.toString();
+    // Unlock all modules and lessons
+    unlockAllModules: function() {
+        console.log('Unlocking all modules and lessons for open access');
         
-        // Find the current lesson
-        const moduleElement = document.getElementById(`module${moduleId}`);
-        if (!moduleElement) return;
+        // Get all module containers
+        const moduleContainers = document.querySelectorAll('.module-container');
         
-        // Get all lesson headers in this module
-        const lessonHeaders = Array.from(moduleElement.querySelectorAll('.accordion-header'));
-        
-        // Find the index of the current lesson
-        const currentIndex = lessonHeaders.findIndex(header => 
-            header.getAttribute('data-module') === moduleId && 
-            header.getAttribute('data-lesson') === lessonId
-        );
-        
-        // If found and not the last lesson in the module
-        if (currentIndex !== -1 && currentIndex < lessonHeaders.length - 1) {
-            // Get the next lesson
-            const nextHeader = lessonHeaders[currentIndex + 1];
-            const nextLessonId = nextHeader.getAttribute('data-lesson');
+        moduleContainers.forEach(moduleContainer => {
+            const moduleId = moduleContainer.id.replace('module', '');
             
-            // Check if it's locked and unlock it
-            const statusElement = nextHeader.querySelector('.status');
-            if (statusElement && statusElement.textContent === 'Locked') {
-                console.log(`Unlocking next lesson ${nextLessonId} in module ${moduleId}`);
-                statusElement.textContent = 'Start';
-                statusElement.className = 'status';
+            // Change module status to 'Not Started' if it's 'Locked'
+            const moduleStatus = moduleContainer.querySelector('.module-status');
+            if (moduleStatus && moduleStatus.textContent === 'Locked') {
+                moduleStatus.textContent = 'Not Started';
+                moduleStatus.className = 'module-status';
             }
-        } else if (currentIndex !== -1 && currentIndex === lessonHeaders.length - 1) {
-            // This was the last lesson in the module, try to unlock next module
-            this.unlockNextModule(parseInt(moduleId));
+            
+            // Unlock all lessons in this module
+            const lessonHeaders = moduleContainer.querySelectorAll('.accordion-header');
+            lessonHeaders.forEach(header => {
+                const statusElement = header.querySelector('.status');
+                if (statusElement && statusElement.textContent === 'Locked') {
+                    statusElement.textContent = 'Start';
+                    statusElement.className = 'status';
+                }
+            });
+        });
+        
+        // Show notification about open access
+        if (typeof window.showNotification === 'function') {
+            window.showNotification('All modules and lessons are now available for open access.', 'info', 5000);
         }
+        
+        // Update UI to reflect the changes
+        this.updateProgressUI();
     },
     
     // Check if a module is complete
@@ -462,9 +456,6 @@ const PlainIDCourse = {
                 moduleStatus.className = 'module-status completed';
             }
             
-            // Unlock next module
-            this.unlockNextModule(parseInt(moduleId));
-            
             // Update progress bars
             this.updateProgressBars();
             
@@ -482,53 +473,6 @@ const PlainIDCourse = {
             
             // Update progress bar
             this.updateProgressBars();
-        }
-    },
-    
-    // Unlock the next module after completing the current one
-    unlockNextModule: function(completedModuleId) {
-        const nextModuleId = completedModuleId + 1;
-        console.log(`Attempting to unlock module ${nextModuleId}`);
-        
-        const nextModuleElement = document.getElementById(`module${nextModuleId}`);
-        if (!nextModuleElement) {
-            console.log(`Module ${nextModuleId} not found, cannot unlock`);
-            return;
-        }
-        
-        // Get the module status
-        const moduleStatus = nextModuleElement.querySelector('.module-status');
-        if (!moduleStatus) {
-            console.log(`Module status element not found for module ${nextModuleId}`);
-            return;
-        }
-        
-        // Only unlock if it's currently locked
-        if (moduleStatus.textContent === 'Locked' || moduleStatus.textContent === 'Not Started') {
-            console.log(`Unlocking module ${nextModuleId}`);
-            
-            // Update status
-            moduleStatus.textContent = 'Not Started';
-            moduleStatus.className = 'module-status';
-            
-            // Also unlock the first lesson
-            const firstLessonHeader = nextModuleElement.querySelector('.accordion-header');
-            if (firstLessonHeader) {
-                const statusElement = firstLessonHeader.querySelector('.status');
-                if (statusElement) {
-                    statusElement.textContent = 'Start';
-                    statusElement.className = 'status';
-                }
-            }
-            
-            // Show notification
-            if (window.showNotification) {
-                const moduleTitle = nextModuleElement.querySelector('.module-header h3')?.textContent || `Module ${nextModuleId}`;
-                window.showNotification(`New module unlocked: ${moduleTitle}`, 'success');
-            }
-            
-            // Update module availability in state
-            this.updateModuleAvailability();
         }
     },
     
@@ -636,17 +580,7 @@ const PlainIDCourse = {
             header.setAttribute('data-has-listener', 'true');
             
             header.addEventListener('click', function() {
-                // Check if the lesson is locked
-                const status = this.querySelector('.status')?.textContent;
-                if (status === 'Locked') {
-                    if (window.showNotification) {
-                        window.showNotification('Please complete the previous lessons first.', 'warning');
-                    } else {
-                        alert('Please complete the previous lessons first.');
-                    }
-                    return;
-                }
-                
+                // No need to check for locked status anymore
                 const content = this.nextElementSibling;
                 
                 // Close all other accordions
@@ -860,6 +794,12 @@ const PlainIDCourse = {
                 } else if (Object.keys(module.lessons || {}).length > 0) {
                     moduleStatus.textContent = 'In Progress';
                     moduleStatus.className = 'module-status ready';
+                } else {
+                    // Ensure all modules are set to 'Not Started' instead of 'Locked'
+                    if (moduleStatus.textContent === 'Locked') {
+                        moduleStatus.textContent = 'Not Started';
+                        moduleStatus.className = 'module-status';
+                    }
                 }
             }
             
@@ -877,355 +817,48 @@ const PlainIDCourse = {
                     }
                 }
             }
+            
+            // Ensure all lessons in the module are unlocked
+            const lessonHeaders = moduleElement.querySelectorAll('.accordion-header');
+            lessonHeaders.forEach(header => {
+                const statusElement = header.querySelector('.status');
+                if (statusElement && statusElement.textContent === 'Locked') {
+                    statusElement.textContent = 'Start';
+                    statusElement.className = 'status';
+                }
+            });
         }
         
         // Update progress bars
         this.updateProgressBars();
         
-        // Unlock modules based on prerequisites
-        this.updateModuleAvailability();
+        // Ensure all modules are unlocked
+        for (let i = 1; i <= 6; i++) {
+            const moduleElement = document.getElementById(`module${i}`);
+            if (moduleElement) {
+                const moduleStatus = moduleElement.querySelector('.module-status');
+                if (moduleStatus && moduleStatus.textContent === 'Locked') {
+                    moduleStatus.textContent = 'Not Started';
+                    moduleStatus.className = 'module-status';
+                }
+                
+                // Unlock all lessons in this module
+                const lessonHeaders = moduleElement.querySelectorAll('.accordion-header');
+                lessonHeaders.forEach(header => {
+                    const statusElement = header.querySelector('.status');
+                    if (statusElement && statusElement.textContent === 'Locked') {
+                        statusElement.textContent = 'Start';
+                        statusElement.className = 'status';
+                    }
+                });
+            }
+        }
         
         // Update certificate name if user has set one
         if (this.state.userProgress.userName) {
             const certificateNameElement = document.querySelector('.certificate-name');
             if (certificateNameElement) {
                 certificateNameElement.textContent = this.state.userProgress.userName;
-            }
-        }
-    },
-    
-    // Update module availability based on prerequisites
-    updateModuleAvailability: function() {
-        console.log("Updating module availability");
-        
-        // First pass: count completed modules and identify last completed
-        let completedModules = [];
-        let lastCompletedModuleId = 0;
-        
-        // Find the highest completed module ID
-        for (let moduleId in this.state.userProgress.modules) {
-            const moduleData = this.state.userProgress.modules[moduleId];
-            const parsedModuleId = parseInt(moduleId);
-            
-            if (moduleData.completed) {
-                completedModules.push(parsedModuleId);
-                if (parsedModuleId > lastCompletedModuleId) {
-                    lastCompletedModuleId = parsedModuleId;
-                }
-            }
-        }
-        
-        console.log(`Found ${completedModules.length} completed modules. Last completed: ${lastCompletedModuleId}`);
-        
-        // Make sure Module 1 is always unlocked
-        const module1 = document.getElementById('module1');
-        if (module1) {
-            const moduleStatus = module1.querySelector('.module-status');
-            if (moduleStatus && (moduleStatus.textContent === 'Locked' || moduleStatus.textContent === 'Not Started')) {
-                moduleStatus.textContent = 'Not Started';
-                moduleStatus.className = 'module-status';
-                this.unlockFirstLesson('1');
-            }
-        }
-        
-        // Second pass: unlock modules based on completion
-        if (lastCompletedModuleId > 0) {
-            // Fixed: Look for the next module to unlock
-            const nextModuleId = lastCompletedModuleId + 1;
-            const nextModuleElement = document.getElementById(`module${nextModuleId}`);
-            
-            if (nextModuleElement) {
-                console.log(`Checking next module ${nextModuleId} for unlocking`);
-                
-                const moduleStatus = nextModuleElement.querySelector('.module-status');
-                if (moduleStatus && moduleStatus.textContent === 'Locked') {
-                    console.log(`Unlocking module ${nextModuleId}`);
-                    
-                    // Unlock the module
-                    moduleStatus.textContent = 'Not Started';
-                    moduleStatus.className = 'module-status';
-                    
-                    // Unlock its first lesson
-                    this.unlockFirstLesson(nextModuleId);
-                    
-                    // Show notification
-                    if (typeof window.showNotification === 'function') {
-                        const moduleTitle = nextModuleElement.querySelector('.module-header h3')?.textContent || `Module ${nextModuleId}`;
-                        window.showNotification(`New module available: ${moduleTitle}`, 'info');
-                    }
-                }
-            }
-            
-            // Also handle the case where the next module already has In Progress status but first lesson is locked
-            if (nextModuleElement) {
-                const moduleStatus = nextModuleElement.querySelector('.module-status');
-                if (moduleStatus && 
-                   (moduleStatus.textContent === 'Not Started' || moduleStatus.textContent === 'In Progress')) {
-                    this.unlockFirstLesson(nextModuleId);
-                }
-            }
-        }
-        
-        // Save state after updates
-        this.saveState();
-    },
-    
-    // Unlock the first lesson in a module
-    unlockFirstLesson: function(moduleId) {
-        console.log(`Unlocking first lesson in module ${moduleId}`);
-        
-        // Get module element
-        const moduleElement = document.getElementById(`module${moduleId}`);
-        if (!moduleElement) {
-            console.warn(`Module element for module ${moduleId} not found`);
-            return;
-        }
-        
-        // Find first lesson header
-        const firstLessonHeader = moduleElement.querySelector('.accordion-header');
-        if (!firstLessonHeader) {
-            console.warn(`No lesson headers found for module ${moduleId}`);
-            return;
-        }
-        
-        // Update status
-        const statusElement = firstLessonHeader.querySelector('.status');
-        if (statusElement) {
-            // Only change status if it's locked
-            if (statusElement.textContent === 'Locked') {
-                console.log(`Unlocking first lesson in module ${moduleId}`);
-                statusElement.textContent = 'Start';
-                statusElement.className = 'status';
-            }
-        } else {
-            console.warn(`Status element not found for first lesson in module ${moduleId}`);
-        }
-    },
-    
-    // Calculate the completion percentage of a module
-    calculateModuleProgress: function(moduleId) {
-        const moduleElement = document.getElementById(`module${moduleId}`);
-        if (!moduleElement) return 0;
-        
-        const lessonHeaders = moduleElement.querySelectorAll('.accordion-header');
-        if (lessonHeaders.length === 0) return 0;
-        
-        let totalLessons = 0;
-        let completedLessons = 0;
-        
-        lessonHeaders.forEach(header => {
-            const lessonId = header.getAttribute('data-lesson');
-            if (lessonId) {
-                totalLessons++;
-                if (this.state.userProgress.modules[moduleId]?.lessons[lessonId]) {
-                    completedLessons++;
-                }
-            }
-        });
-        
-        return totalLessons > 0 ? (completedLessons / totalLessons) * 100 : 0;
-    },
-    
-    // Set up a monitor to automatically fix module progression issues
-    setupModuleProgressionMonitor: function() {
-        console.log("Setting up module progression monitor");
-        
-        // Check every 2 seconds for module progression issues
-        setInterval(() => {
-            this.checkAndFixModuleProgression();
-        }, 2000);
-    },
-    
-    // Scan for and fix module progression issues
-    checkAndFixModuleProgression: function() {
-        // Make sure Module 1 is always unlocked
-        this.ensureModuleOneUnlocked();
-        
-        // Make sure completed modules are properly marked
-        this.ensureModulesCorrectlyMarked();
-        
-        // Make sure next modules after completed ones are unlocked
-        this.ensureNextModulesUnlocked();
-        
-        // Make sure first lessons in unlocked modules are accessible
-        this.ensureFirstLessonsUnlocked();
-        
-        // Make sure completed lessons have correct UI state
-        this.ensureCompletedLessonsMarked();
-        
-        // Make sure next lessons after completed ones are unlocked
-        this.ensureNextLessonsUnlocked();
-    },
-    
-    // Ensure Module 1 is always unlocked
-    ensureModuleOneUnlocked: function() {
-        const module1 = document.getElementById('module1');
-        if (!module1) return;
-        
-        const moduleStatus = module1.querySelector('.module-status');
-        if (moduleStatus && moduleStatus.textContent === 'Locked') {
-            console.log("Monitor: Fixing locked Module 1");
-            
-            moduleStatus.textContent = 'Not Started';
-            moduleStatus.className = 'module-status';
-            
-            // Also unlock first lesson
-            this.unlockFirstLesson('1');
-            
-            // Update state
-            if (!this.state.userProgress.modules[1]) {
-                this.state.userProgress.modules[1] = {
-                    completed: false,
-                    lessons: {}
-                };
-            }
-            
-            this.saveState();
-        }
-    },
-    
-    // Ensure all modules are correctly marked as completed or in-progress
-    ensureModulesCorrectlyMarked: function() {
-        for (let moduleId in this.state.userProgress.modules) {
-            const moduleData = this.state.userProgress.modules[moduleId];
-            const moduleElement = document.getElementById(`module${moduleId}`);
-            
-            if (!moduleElement) continue;
-            
-            const moduleStatus = moduleElement.querySelector('.module-status');
-            if (!moduleStatus) continue;
-            
-            // Check for completed modules
-            if (moduleData.completed) {
-                if (moduleStatus.textContent !== 'Completed') {
-                    console.log(`Monitor: Fixing status for completed module ${moduleId}`);
-                    moduleStatus.textContent = 'Completed';
-                    moduleStatus.className = 'module-status completed';
-                }
-            } 
-            // Check for in-progress modules
-            else if (Object.keys(moduleData.lessons || {}).length > 0) {
-                if (moduleStatus.textContent === 'Locked') {
-                    console.log(`Monitor: Fixing status for in-progress module ${moduleId}`);
-                    moduleStatus.textContent = 'In Progress';
-                    moduleStatus.className = 'module-status ready';
-                }
-            }
-        }
-    },
-    
-    // Ensure modules after completed ones are unlocked
-    ensureNextModulesUnlocked: function() {
-        // Find highest completed module
-        let highestCompleted = 0;
-        
-        for (let moduleId in this.state.userProgress.modules) {
-            if (this.state.userProgress.modules[moduleId].completed) {
-                const parsedId = parseInt(moduleId);
-                if (parsedId > highestCompleted) {
-                    highestCompleted = parsedId;
-                }
-            }
-        }
-        
-        // If we found a completed module, ensure the next one is unlocked
-        if (highestCompleted > 0) {
-            const nextModuleId = highestCompleted + 1;
-            const nextModule = document.getElementById(`module${nextModuleId}`);
-            
-            if (nextModule) {
-                const moduleStatus = nextModule.querySelector('.module-status');
-                if (moduleStatus && moduleStatus.textContent === 'Locked') {
-                    console.log(`Monitor: Unlocking module ${nextModuleId} after completed module ${highestCompleted}`);
-                    
-                    moduleStatus.textContent = 'Not Started';
-                    moduleStatus.className = 'module-status';
-                    
-                    // Unlock first lesson
-                    this.unlockFirstLesson(nextModuleId);
-                }
-            }
-        }
-    },
-    
-    // Ensure first lessons in unlocked modules are accessible
-    ensureFirstLessonsUnlocked: function() {
-        for (let i = 1; i <= 6; i++) {
-            const moduleElement = document.getElementById(`module${i}`);
-            if (!moduleElement) continue;
-            
-            const moduleStatus = moduleElement.querySelector('.module-status');
-            if (!moduleStatus) continue;
-            
-            // If module is not locked, ensure first lesson is accessible
-            if (moduleStatus.textContent !== 'Locked') {
-                const firstLessonHeader = moduleElement.querySelector('.accordion-header');
-                if (!firstLessonHeader) continue;
-                
-                const statusElement = firstLessonHeader.querySelector('.status');
-                if (statusElement && statusElement.textContent === 'Locked') {
-                    console.log(`Monitor: Unlocking first lesson in accessible module ${i}`);
-                    statusElement.textContent = 'Start';
-                    statusElement.className = 'status';
-                }
-            }
-        }
-    },
-    
-    // Ensure completed lessons have correct UI state
-    ensureCompletedLessonsMarked: function() {
-        for (let moduleId in this.state.userProgress.modules) {
-            const moduleData = this.state.userProgress.modules[moduleId];
-            const moduleElement = document.getElementById(`module${moduleId}`);
-            
-            if (!moduleElement) continue;
-            
-            // Check each completed lesson
-            for (let lessonId in moduleData.lessons) {
-                if (!moduleData.lessons[lessonId]) continue;
-                
-                const lessonHeader = moduleElement.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
-                if (!lessonHeader) continue;
-                
-                const statusElement = lessonHeader.querySelector('.status');
-                if (statusElement && statusElement.textContent !== 'Completed') {
-                    console.log(`Monitor: Fixing status for completed lesson ${lessonId} in module ${moduleId}`);
-                    statusElement.textContent = 'Completed';
-                    statusElement.className = 'status completed';
-                }
-            }
-        }
-    },
-    
-    // Ensure next lessons after completed ones are unlocked
-    ensureNextLessonsUnlocked: function() {
-        for (let moduleId in this.state.userProgress.modules) {
-            const moduleData = this.state.userProgress.modules[moduleId];
-            const moduleElement = document.getElementById(`module${moduleId}`);
-            
-            if (!moduleElement) continue;
-            
-            // Get all lesson headers
-            const lessonHeaders = Array.from(moduleElement.querySelectorAll('.accordion-header'));
-            
-            // Check each lesson
-            for (let i = 0; i < lessonHeaders.length - 1; i++) {
-                const currentHeader = lessonHeaders[i];
-                const nextHeader = lessonHeaders[i + 1];
-                
-                const currentLessonId = currentHeader.getAttribute('data-lesson');
-                
-                // If current lesson is completed but next is locked, unlock next
-                if (moduleData.lessons[currentLessonId]) {
-                    const nextStatusElement = nextHeader.querySelector('.status');
-                    if (nextStatusElement && nextStatusElement.textContent === 'Locked') {
-                        const nextLessonId = nextHeader.getAttribute('data-lesson');
-                        console.log(`Monitor: Unlocking lesson ${nextLessonId} after completed lesson ${currentLessonId} in module ${moduleId}`);
-                        
-                        nextStatusElement.textContent = 'Start';
-                        nextStatusElement.className = 'status';
-                    }
-                }
             }
         }
     },
@@ -1239,55 +872,7 @@ const PlainIDCourse = {
             return;
         }
             
-        // Check if module is locked - specifically check for 'Locked' text
-        const moduleStatus = moduleElement.querySelector('.module-status')?.textContent;
-        if (moduleStatus === 'Locked') {
-            if (window.showNotification) {
-                window.showNotification('Please complete the previous modules first.', 'warning');
-            } else {
-                alert('Please complete the previous modules first.');
-            }
-            return;
-        }
-            
         // Smooth scroll to module
         moduleElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
             
-        // Open first accessible lesson if not already open
-        setTimeout(() => {
-            let firstAccessibleLesson = null;
-                
-            // Find first lesson that's not locked
-            for (let i = 1; i <= 10; i++) {
-                const lessonHeader = moduleElement.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${i}"]`);
-                if (!lessonHeader) break;
-                    
-                const status = lessonHeader.querySelector('.status')?.textContent;
-                if (status !== 'Locked') {
-                    firstAccessibleLesson = lessonHeader;
-                    break;
-                }
-            }
-                
-            if (firstAccessibleLesson && !firstAccessibleLesson.classList.contains('active')) {
-                // Close all accordion contents
-                document.querySelectorAll('.accordion-content').forEach(content => {
-                    content.classList.remove('active');
-                });
-                    
-                document.querySelectorAll('.accordion-header').forEach(header => {
-                    header.classList.remove('active');
-                });
-                    
-                // Open first accessible lesson
-                firstAccessibleLesson.classList.add('active');
-                if (firstAccessibleLesson.nextElementSibling) {
-                    firstAccessibleLesson.nextElementSibling.classList.add('active');
-                }
-                    
-                // Trigger click event to update breadcrumbs (via bubbling)
-                firstAccessibleLesson.click();
-            }
-        }, 600);
-    }
-};
+        //
