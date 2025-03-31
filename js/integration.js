@@ -1291,11 +1291,3 @@ const PlainIDCourse = {
         }, 600);
     }
 };
-
-// Initialize when the document is ready
-document.addEventListener('DOMContentLoaded', function() {
-    PlainIDCourse.init();
-});
-
-// Re-export the utility functions for use by other scripts
-window.PlainIDCourse = PlainIDCourse;
