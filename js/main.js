@@ -196,6 +196,12 @@ function initializeQuizzes() {
  */
 function markLessonComplete(moduleId, lessonId) {
     try {
+        // If PlainIDCourse is available, use its method
+        if (window.PlainIDCourse && typeof window.PlainIDCourse.markLessonComplete === 'function') {
+            window.PlainIDCourse.markLessonComplete(moduleId, lessonId);
+            return;
+        }
+        
         // Get progress data from localStorage
         let progress = {};
         const storedProgress = localStorage.getItem('plainidCourseProgress');
@@ -258,6 +264,9 @@ function markLessonComplete(moduleId, lessonId) {
             }
         }
         
+        // Unlock next lesson
+        unlockNextLesson(moduleId, lessonId);
+        
         // Save progress
         localStorage.setItem('plainidCourseProgress', JSON.stringify(progress));
     } catch (e) {
@@ -266,7 +275,38 @@ function markLessonComplete(moduleId, lessonId) {
 }
 
 /**
- * Unlock the next module after completing a module
+ * Unlock the next lesson after the current one
+ * @param {string} moduleId - Module ID
+ * @param {string} lessonId - Lesson ID
+ */
+function unlockNextLesson(moduleId, lessonId) {
+    // Find current lesson header
+    const currentHeader = document.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
+    if (!currentHeader) return;
+    
+    // Get all headers in this module
+    const moduleElement = document.getElementById(`module${moduleId}`);
+    if (!moduleElement) return;
+    
+    const headers = Array.from(moduleElement.querySelectorAll('.accordion-header'));
+    const currentIndex = headers.indexOf(currentHeader);
+    
+    if (currentIndex >= 0 && currentIndex < headers.length - 1) {
+        // Get next lesson header
+        const nextHeader = headers[currentIndex + 1];
+        const nextLessonId = nextHeader.getAttribute('data-lesson');
+        
+        // Unlock next lesson if locked
+        const statusElement = nextHeader.querySelector('.status');
+        if (statusElement && statusElement.textContent === 'Locked') {
+            statusElement.textContent = 'Start';
+            statusElement.className = 'status';
+        }
+    }
+}
+
+/**
+ * Unlock the next module after completing the current one
  * @param {number} completedModuleId - The ID of the completed module
  */
 function unlockNextModule(completedModuleId) {
@@ -289,9 +329,6 @@ function unlockNextModule(completedModuleId) {
                     statusElement.className = 'status';
                 }
             }
-            
-            // Show alert
-            alert(`New module unlocked: ${nextModule.querySelector('.module-header h3')?.textContent || `Module ${nextModuleId}`}`);
         }
     }
 }
@@ -366,6 +403,14 @@ function navigateToNextLesson(moduleId, lessonId) {
             // Open first lesson if available
             const firstHeader = nextModule.querySelector('.accordion-header');
             if (firstHeader) {
+                // Unlock first lesson if needed
+                const firstStatusElement = firstHeader.querySelector('.status');
+                if (firstStatusElement && firstStatusElement.textContent === 'Locked') {
+                    firstStatusElement.textContent = 'Start';
+                    firstStatusElement.className = 'status';
+                }
+                
+                // Open the lesson
                 firstHeader.classList.add('active');
                 const firstContent = firstHeader.nextElementSibling;
                 if (firstContent) {
@@ -570,6 +615,35 @@ function addProgressMonitor() {
                             console.log(`[Progress Monitor] Fixing module ${moduleId} status - should be 'In Progress'`);
                             moduleStatus.textContent = 'In Progress';
                             moduleStatus.className = 'module-status ready';
+                        }
+                    }
+                }
+            }
+            
+            // Fix next lessons not being unlocked after completed ones
+            for (const moduleId in progress.modules) {
+                const moduleData = progress.modules[moduleId];
+                const moduleElement = document.getElementById(`module${moduleId}`);
+                
+                if (!moduleElement) continue;
+                
+                // Get all lesson headers in order
+                const lessonHeaders = Array.from(moduleElement.querySelectorAll('.accordion-header'));
+                
+                // Check each lesson
+                for (let i = 0; i < lessonHeaders.length - 1; i++) {
+                    const currentHeader = lessonHeaders[i];
+                    const nextHeader = lessonHeaders[i + 1];
+                    
+                    const currentLessonId = currentHeader.getAttribute('data-lesson');
+                    
+                    // If current lesson is completed but next is locked, unlock next
+                    if (moduleData.lessons[currentLessonId]) {
+                        const nextLessonStatus = nextHeader.querySelector('.status');
+                        if (nextLessonStatus && nextLessonStatus.textContent === 'Locked') {
+                            console.log(`[Progress Monitor] Fixing locked next lesson after completed lesson ${currentLessonId}`);
+                            nextLessonStatus.textContent = 'Start';
+                            nextLessonStatus.className = 'status';
                         }
                     }
                 }
