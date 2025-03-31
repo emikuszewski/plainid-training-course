@@ -141,17 +141,6 @@ class ModuleNavigator {
             return;
         }
         
-        // Check if module is locked
-        const moduleStatus = moduleElement.querySelector('.module-status')?.textContent;
-        if (moduleStatus === 'Locked') {
-            if (window.showNotification) {
-                window.showNotification('Please complete the previous modules first.', 'warning');
-            } else {
-                alert('Please complete the previous modules first.');
-            }
-            return;
-        }
-        
         // Smooth scroll to module
         moduleElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
         
@@ -159,19 +148,9 @@ class ModuleNavigator {
         setTimeout(() => {
             let firstAccessibleLesson = null;
             
-            // Find first lesson that's not locked
-            for (let i = 1; i <= 10; i++) {
-                const lessonHeader = moduleElement.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${i}"]`);
-                if (!lessonHeader) break;
-                
-                const status = lessonHeader.querySelector('.status')?.textContent;
-                if (status !== 'Locked') {
-                    firstAccessibleLesson = lessonHeader;
-                    break;
-                }
-            }
-            
-            if (firstAccessibleLesson && !firstAccessibleLesson.classList.contains('active')) {
+            // Find first lesson (all are accessible now)
+            const firstLessonHeader = moduleElement.querySelector('.accordion-header');
+            if (firstLessonHeader && !firstLessonHeader.classList.contains('active')) {
                 // Close all accordion contents
                 document.querySelectorAll('.accordion-content').forEach(content => {
                     content.classList.remove('active');
@@ -181,14 +160,14 @@ class ModuleNavigator {
                     header.classList.remove('active');
                 });
                 
-                // Open first accessible lesson
-                firstAccessibleLesson.classList.add('active');
-                if (firstAccessibleLesson.nextElementSibling) {
-                    firstAccessibleLesson.nextElementSibling.classList.add('active');
+                // Open first lesson
+                firstLessonHeader.classList.add('active');
+                if (firstLessonHeader.nextElementSibling) {
+                    firstLessonHeader.nextElementSibling.classList.add('active');
                 }
                 
                 // Trigger click event to update breadcrumbs (via bubbling)
-                firstAccessibleLesson.click();
+                firstLessonHeader.click();
             }
         }, 600);
         
@@ -210,17 +189,6 @@ class ModuleNavigator {
         // Open target lesson
         const targetHeader = document.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
         if (targetHeader) {
-            // Check if lesson is accessible
-            const status = targetHeader.querySelector('.status')?.textContent;
-            if (status === 'Locked') {
-                if (window.showNotification) {
-                    window.showNotification('Please complete the previous lessons first.', 'warning');
-                } else {
-                    alert('Please complete the previous lessons first.');
-                }
-                return;
-            }
-            
             const targetContent = targetHeader.nextElementSibling;
             
             targetHeader.classList.add('active');
@@ -545,19 +513,6 @@ class ModuleNavigator {
             // There's another lesson in this module
             const nextHeader = headers[currentIndex + 1];
             
-            // Check if it's locked
-            const nextStatus = nextHeader.querySelector('.status')?.textContent;
-            if (nextStatus === 'Locked') {
-                console.log("Next lesson is locked - unlocking it");
-                
-                // Unlock it since the previous lesson is complete
-                const statusElement = nextHeader.querySelector('.status');
-                if (statusElement) {
-                    statusElement.textContent = 'Start';
-                    statusElement.className = 'status';
-                }
-            }
-            
             // Navigate to next lesson
             this.navigateToLesson(moduleId, nextHeader.getAttribute('data-lesson'));
         } else {
@@ -580,33 +535,6 @@ class ModuleNavigator {
                     certSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
                 return;
-            }
-            
-            // Check if next module is locked
-            const nextModuleStatus = nextModule.querySelector('.module-status')?.textContent;
-            if (nextModuleStatus === 'Locked') {
-                console.log(`Next module ${nextModuleId} is locked - unlocking it`);
-                
-                // Unlock it
-                const moduleStatus = nextModule.querySelector('.module-status');
-                if (moduleStatus) {
-                    moduleStatus.textContent = 'Not Started';
-                    moduleStatus.className = 'module-status';
-                }
-                
-                // Also unlock first lesson
-                const firstLesson = nextModule.querySelector('.accordion-header');
-                if (firstLesson) {
-                    const statusElement = firstLesson.querySelector('.status');
-                    if (statusElement) {
-                        statusElement.textContent = 'Start';
-                        statusElement.className = 'status';
-                    }
-                }
-                
-                if (window.showNotification) {
-                    window.showNotification(`Module ${nextModuleId} has been unlocked!`, 'success');
-                }
             }
             
             // Navigate to the next module
