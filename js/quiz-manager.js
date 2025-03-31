@@ -111,8 +111,7 @@ class QuizManager {
         if (!questionContainer || questionContainer.classList.contains('answered')) return;
         
         const moduleId = questionContainer.getAttribute('data-module');
-        const lessonId = questionContainer.getAttribute('data-question');
-        const questionId = questionContainer.getAttribute('data-question');
+        const lessonId = questionContainer.getAttribute('data-lesson');
         
         // Only proceed if we have valid module and lesson IDs
         if (!moduleId || !lessonId) return;
@@ -279,7 +278,48 @@ class QuizManager {
     navigateToNextLesson(moduleId, lessonId) {
         console.log(`Navigating to next lesson after completing module ${moduleId}, lesson ${lessonId}`);
         
-        // Get the current lesson header
+        // Use the centralized function if available
+        if (window.PlainIDCourse && typeof window.PlainIDCourse.navigateToModule === 'function') {
+            // First try to find the next lesson in the same module
+            const moduleElement = document.getElementById(`module${moduleId}`);
+            if (moduleElement) {
+                const headers = Array.from(moduleElement.querySelectorAll('.accordion-header'));
+                const currentHeader = moduleElement.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
+                
+                if (currentHeader) {
+                    const currentIndex = headers.indexOf(currentHeader);
+                    
+                    if (currentIndex >= 0 && currentIndex < headers.length - 1) {
+                        // Navigate to the next lesson in the same module
+                        const nextHeader = headers[currentIndex + 1];
+                        const nextLessonId = nextHeader.getAttribute('data-lesson');
+                        
+                        // Close current accordion
+                        currentHeader.classList.remove('active');
+                        if (currentHeader.nextElementSibling) {
+                            currentHeader.nextElementSibling.classList.remove('active');
+                        }
+                        
+                        // Open next accordion
+                        nextHeader.classList.add('active');
+                        if (nextHeader.nextElementSibling) {
+                            nextHeader.nextElementSibling.classList.add('active');
+                        }
+                        
+                        // Scroll to new position
+                        nextHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                        return;
+                    }
+                }
+                
+                // If we're at the last lesson, go to the next module
+                const nextModuleId = parseInt(moduleId) + 1;
+                window.PlainIDCourse.navigateToModule(nextModuleId);
+                return;
+            }
+        }
+        
+        // Fallback implementation
         const currentHeader = document.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
         if (!currentHeader) {
             console.warn(`Could not find header for module ${moduleId}, lesson ${lessonId}`);
@@ -408,6 +448,12 @@ class QuizManager {
         // Call the global lesson completion function if available
         if (typeof window.markLessonComplete === 'function') {
             window.markLessonComplete(moduleId, lessonId);
+            return;
+        }
+        
+        // Use PlainIDCourse if available
+        if (window.PlainIDCourse && typeof window.PlainIDCourse.markLessonComplete === 'function') {
+            window.PlainIDCourse.markLessonComplete(moduleId, lessonId);
             return;
         }
         
