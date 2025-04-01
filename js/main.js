@@ -11,8 +11,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Add progress tracking module progression indicator to detect and fix issues
     addProgressMonitor();
     
-    // Ensure all modules and lessons are unlocked
+    // Ensure all modules and lessons are unlocked and visible
     unlockAllModulesAndLessons();
+    ensureModulesVisible();
 });
 
 /**
@@ -33,6 +34,9 @@ function initializeComponents() {
     
     // Ensure all modules and lessons are unlocked
     unlockAllModulesAndLessons();
+    
+    // Ensure all modules are visible
+    ensureModulesVisible();
 }
 
 /**
@@ -302,6 +306,51 @@ function unlockAllModulesAndLessons() {
 }
 
 /**
+ * Ensure all modules are visible
+ */
+function ensureModulesVisible() {
+    console.log('Ensuring all modules are visible');
+    
+    // Make sure all module containers are visible
+    const moduleContainers = document.querySelectorAll('.module-container');
+    
+    moduleContainers.forEach(moduleContainer => {
+        // Make sure the module container is visible
+        moduleContainer.style.display = 'block';
+        
+        // Ensure the module content is properly displayed
+        const moduleContent = moduleContainer.querySelector('.module-content');
+        if (moduleContent) {
+            moduleContent.style.display = 'block';
+        }
+    });
+    
+    // Add CSS fixes to ensure visibility
+    let styleElement = document.getElementById('module-visibility-fixes');
+    if (!styleElement) {
+        styleElement = document.createElement('style');
+        styleElement.id = 'module-visibility-fixes';
+        styleElement.textContent = `
+            .module-container {
+                display: block !important;
+                margin-bottom: 40px !important;
+            }
+            
+            .module-content {
+                display: block !important;
+            }
+            
+            .accordion-content.active {
+                display: block !important;
+                max-height: 2000px !important;
+                padding: 25px !important;
+            }
+        `;
+        document.head.appendChild(styleElement);
+    }
+}
+
+/**
  * Navigate to the next lesson after completing the current one
  * @param {string} moduleId - Current module ID
  * @param {string} lessonId - Current lesson ID
@@ -383,15 +432,31 @@ function initializeModuleProgression() {
     // This function would be implemented to track progress
     // For now, it's a placeholder that just ensures modules are unlocked
     unlockAllModulesAndLessons();
+    ensureModulesVisible();
 }
 
 /**
  * Add progress monitor to detect and fix issues with module progression
  */
 function addProgressMonitor() {
-    // This function would implement progress monitoring logic
-    // For now, it's a placeholder that just ensures modules are unlocked
-    setTimeout(() => {
-        unlockAllModulesAndLessons();
-    }, 1000); // Check again after 1 second to ensure UI is updated
+    // Periodically check if all modules are visible
+    setInterval(() => {
+        const moduleContainers = document.querySelectorAll('.module-container');
+        moduleContainers.forEach(moduleContainer => {
+            // Make sure module container is visible
+            if (moduleContainer.style.display === 'none' || 
+                getComputedStyle(moduleContainer).display === 'none') {
+                moduleContainer.style.display = 'block';
+                console.log('Forced module visibility for', moduleContainer.id);
+            }
+            
+            // Make sure module content is visible
+            const moduleContent = moduleContainer.querySelector('.module-content');
+            if (moduleContent && (moduleContent.style.display === 'none' || 
+                getComputedStyle(moduleContent).display === 'none')) {
+                moduleContent.style.display = 'block';
+                console.log('Forced module content visibility for', moduleContainer.id);
+            }
+        });
+    }, 2000); // Check every 2 seconds
 }
