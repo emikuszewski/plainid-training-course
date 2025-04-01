@@ -875,4 +875,32 @@ const PlainIDCourse = {
         // Smooth scroll to module
         moduleElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
             
-        //
+        // Open first accessible lesson if not already open
+        setTimeout(() => {
+            let firstAccessibleLesson = null;
+            
+            // Find first lesson
+            const firstLessonHeader = moduleElement.querySelector('.accordion-header');
+            if (firstLessonHeader && !firstLessonHeader.classList.contains('active')) {
+                // Close all accordion contents
+                document.querySelectorAll('.accordion-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                
+                document.querySelectorAll('.accordion-header').forEach(header => {
+                    header.classList.remove('active');
+                });
+                
+                // Open first lesson
+                firstLessonHeader.classList.add('active');
+                if (firstLessonHeader.nextElementSibling) {
+                    firstLessonHeader.nextElementSibling.classList.add('active');
+                }
+                
+                // Update current module and lesson in state
+                this.state.currentModule = moduleId;
+                this.state.currentLesson = firstLessonHeader.getAttribute('data-lesson');
+            }
+        }, 600);
+    }
+};
