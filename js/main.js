@@ -327,3 +327,71 @@ function navigateToNextLesson(moduleId, lessonId) {
         const currentContent = currentHeader.nextElementSibling;
         if (currentContent) {
             currentContent.classList.remove('active');
+        }
+        
+        // Open next lesson
+        nextHeader.classList.add('active');
+        const nextContent = nextHeader.nextElementSibling;
+        if (nextContent) {
+            nextContent.classList.add('active');
+        }
+        
+        // Scroll to next lesson
+        nextHeader.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+        // This is the last lesson in the module, try to go to the next module
+        const nextModuleId = parseInt(moduleId) + 1;
+        const nextModule = document.getElementById(`module${nextModuleId}`);
+        
+        if (nextModule) {
+            // Close current module's last lesson
+            currentHeader.classList.remove('active');
+            const currentContent = currentHeader.nextElementSibling;
+            if (currentContent) {
+                currentContent.classList.remove('active');
+            }
+            
+            // Navigate to the next module
+            nextModule.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            
+            // Open the first lesson of the next module
+            const firstLessonHeader = nextModule.querySelector('.accordion-header');
+            if (firstLessonHeader) {
+                firstLessonHeader.classList.add('active');
+                const firstLessonContent = firstLessonHeader.nextElementSibling;
+                if (firstLessonContent) {
+                    firstLessonContent.classList.add('active');
+                }
+            }
+        } else {
+            // No more modules - show completion message
+            alert('Congratulations! You have completed all modules.');
+            
+            // Scroll to certification section if it exists
+            const certificationSection = document.getElementById('certification');
+            if (certificationSection) {
+                certificationSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    }
+}
+
+/**
+ * Initialize module progression tracking
+ */
+function initializeModuleProgression() {
+    // This function would be implemented to track progress
+    // For now, it's a placeholder that just ensures modules are unlocked
+    unlockAllModulesAndLessons();
+}
+
+/**
+ * Add progress monitor to detect and fix issues with module progression
+ */
+function addProgressMonitor() {
+    // This function would implement progress monitoring logic
+    // For now, it's a placeholder that just ensures modules are unlocked
+    setTimeout(() => {
+        unlockAllModulesAndLessons();
+    }, 1000); // Check again after 1 second to ensure UI is updated
+}
