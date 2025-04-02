@@ -13,14 +13,25 @@ class QuizManager {
     constructor() {
         this.quizElements = document.querySelectorAll('.quiz-container');
         this.results = {};
+        this.initialized = false;
         this.init();
     }
 
     init() {
+        // Prevent duplicate initialization
+        if (this.initialized) {
+            console.log('QuizManager already initialized');
+            return;
+        }
+        
         // Only initialize if quiz elements exist
         if (this.quizElements.length > 0) {
+            console.log(`Initializing QuizManager with ${this.quizElements.length} quizzes found`);
             this.setupQuizzes();
             this.bindEvents();
+            this.initialized = true;
+        } else {
+            console.log('No quiz elements found to initialize');
         }
     }
 
@@ -196,7 +207,7 @@ class QuizManager {
                     this.results[moduleId][lessonId].completed = true;
                 }
                 
-                // Get correct lessonId from the parent quiz question
+                // Get correct lesson ID from the parent quiz question
                 const correctLessonId = questionContainer.getAttribute('data-lesson');
                 
                 // Show completion message
@@ -277,6 +288,53 @@ class QuizManager {
 
     navigateToNextLesson(moduleId, lessonId) {
         console.log(`Navigating to next lesson after completing module ${moduleId}, lesson ${lessonId}`);
+        
+        // First ensure all modules are visible
+        this.ensureModulesVisible();
+        
+        // Try to use ModuleNavigator first
+        if (window.moduleNavigator && typeof window.moduleNavigator.navigateToLesson === 'function') {
+            // Find the next lesson in the same module
+            const moduleElement = document.getElementById(`module${moduleId}`);
+            if (moduleElement) {
+                const headers = Array.from(moduleElement.querySelectorAll('.accordion-header'));
+                const currentHeader = moduleElement.querySelector(`.accordion-header[data-module="${moduleId}"][data-lesson="${lessonId}"]`);
+                
+                if (currentHeader) {
+                    const currentIndex = headers.indexOf(currentHeader);
+                    
+                    if (currentIndex >= 0 && currentIndex < headers.length - 1) {
+                        // Navigate to the next lesson in the same module
+                        const nextHeader = headers[currentIndex + 1];
+                        const nextLessonId = nextHeader.getAttribute('data-lesson');
+                        window.moduleNavigator.navigateToLesson(moduleId, nextLessonId);
+                        return;
+                    }
+                }
+                
+                // If we're at the last lesson, go to the next module
+                const nextModuleId = parseInt(moduleId) + 1;
+                const nextModule = document.getElementById(`module${nextModuleId}`);
+                if (nextModule) {
+                    const firstLessonHeader = nextModule.querySelector('.accordion-header');
+                    const firstLessonId = firstLessonHeader?.getAttribute('data-lesson');
+                    if (firstLessonId) {
+                        window.moduleNavigator.navigateToLesson(nextModuleId, firstLessonId);
+                        return;
+                    }
+                } else {
+                    // No more modules - go to certification
+                    const certSection = document.getElementById('certification');
+                    if (certSection) {
+                        certSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                    
+                    // Show completion notification
+                    this.showNotification('Congratulations! You have completed all modules.', 'success');
+                    return;
+                }
+            }
+        }
         
         // Use the centralized function if available
         if (window.PlainIDCourse && typeof window.PlainIDCourse.navigateToModule === 'function') {
@@ -387,19 +445,12 @@ class QuizManager {
                 }
                 
                 // Notification
-                if (window.showNotification) {
-                    const moduleName = nextModule.querySelector('.module-header h3')?.textContent || `Module ${nextModuleId}`;
-                    window.showNotification(`Moving to ${moduleName}`, 'info');
-                }
+                this.showNotification(`Moving to next module: ${this.getModuleTitle(nextModuleId)}`, 'info');
             } else {
                 // No more modules
                 console.log("No more modules available - course complete!");
                 
-                if (window.showNotification) {
-                    window.showNotification('Congratulations! You have completed all the modules.', 'success');
-                } else {
-                    alert('Congratulations! You have completed all the modules.');
-                }
+                this.showNotification('Congratulations! You have completed all the modules.', 'success');
                 
                 // Scroll to certification section, if available
                 const certSection = document.getElementById('certification');
@@ -496,11 +547,21 @@ class QuizManager {
                         moduleStatus.textContent = 'Completed';
                         moduleStatus.className = 'module-status completed';
                     }
+                    
+                    // Dispatch module completion event
+                    document.dispatchEvent(new CustomEvent('module-completed', {
+                        detail: { moduleId }
+                    }));
                 }
             }
             
             // Save progress
             localStorage.setItem('plainidCourseProgress', JSON.stringify(progress));
+            
+            // Dispatch lesson completion event
+            document.dispatchEvent(new CustomEvent('lesson-completed', {
+                detail: { moduleId, lessonId }
+            }));
         } catch (e) {
             console.error('Error saving lesson completion:', e);
         }
@@ -527,6 +588,204 @@ class QuizManager {
             });
         } catch (e) {
             console.log('Error playing sound', e);
+        }
+    }
+    
+    getModuleTitle(moduleId) {
+        // Try to get from DOM
+        const moduleElement = document.getElementById(`module${moduleId}`);
+        if (moduleElement) {
+            const headerText = moduleElement.querySelector('.module-header h3')?.textContent;
+            if (headerText) {
+                return headerText;
+            }
+        }
+        
+        // Fallback to predefined titles
+        const moduleTitles = {
+            1: 'Core Concepts of Authorization',
+            2: 'PlainID Architecture & Components',
+            3: 'Policy Modeling & Design',
+            4: 'Implementation & Integration',
+            5: 'Advanced Features',
+            6: 'Best Practices & Case Studies'
+        };
+        
+        return moduleTitles[moduleId] || `Module ${moduleId}`;
+    }
+    
+    showNotification(message, type = 'info', duration = 3000) {
+        // Use global notification function if available
+        if (typeof window.showNotification === 'function') {
+            window.showNotification(message, type, duration);
+            return;
+        }
+        
+        // Fallback implementation
+        // Remove existing notification
+        const existingNotification = document.querySelector('.quiz-notification');
+        if (existingNotification) {
+            existingNotification.remove();
+        }
+        
+        // Create notification
+        const notification = document.createElement('div');
+        notification.className = `quiz-notification ${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">${message}</div>
+            <button class="notification-close">&times;</button>
+        `;
+        
+        // Add to document
+        document.body.appendChild(notification);
+        
+        // Show notification with animation
+        setTimeout(() => {
+            notification.classList.add('visible');
+        }, 10);
+        
+        // Add close button handler
+        const closeButton = notification.querySelector('.notification-close');
+        if (closeButton) {
+            closeButton.addEventListener('click', () => {
+                notification.classList.remove('visible');
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            });
+        }
+        
+        // Auto hide after duration
+        setTimeout(() => {
+            notification.classList.remove('visible');
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }, duration);
+        
+        // Add styles if they don't exist already
+        this.addNotificationStyles();
+    }
+    
+    addNotificationStyles() {
+        // Skip if styles already exist
+        if (document.getElementById('quiz-notification-styles')) {
+            return;
+        }
+        
+        const style = document.createElement('style');
+        style.id = 'quiz-notification-styles';
+        style.textContent = `
+            .quiz-notification {
+                position: fixed;
+                top: 20px;
+                right: 20px;
+                padding: 12px 15px;
+                background-color: #f8f9fa;
+                border-radius: 8px;
+                box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
+                display: flex;
+                align-items: center;
+                max-width: 350px;
+                transform: translateX(120%);
+                opacity: 0;
+                transition: transform 0.3s ease, opacity 0.3s ease;
+                z-index: 9999;
+            }
+            
+            .quiz-notification.visible {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            
+            .notification-content {
+                flex: 1;
+                margin-right: 10px;
+            }
+            
+            .notification-close {
+                background: none;
+                border: none;
+                font-size: 18px;
+                cursor: pointer;
+                color: #999;
+                padding: 0;
+                width: 24px;
+                height: 24px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+            }
+            
+            .notification-close:hover {
+                color: #333;
+            }
+            
+            .quiz-notification.success {
+                background-color: #d4edda;
+                border-left: 4px solid #28a745;
+            }
+            
+            .quiz-notification.error {
+                background-color: #f8d7da;
+                border-left: 4px solid #dc3545;
+            }
+            
+            .quiz-notification.warning {
+                background-color: #fff3cd;
+                border-left: 4px solid #ffc107;
+            }
+            
+            .quiz-notification.info {
+                background-color: #d1ecf1;
+                border-left: 4px solid #17a2b8;
+            }
+        `;
+        
+        document.head.appendChild(style);
+    }
+    
+    ensureModulesVisible() {
+        console.log('Ensuring all modules are visible from QuizManager');
+        
+        // Make sure all module containers are visible
+        const moduleContainers = document.querySelectorAll('.module-container');
+        
+        moduleContainers.forEach(moduleContainer => {
+            // Make sure the module container is visible
+            moduleContainer.style.display = 'block';
+            
+            // Ensure the module content is properly displayed
+            const moduleContent = moduleContainer.querySelector('.module-content');
+            if (moduleContent) {
+                moduleContent.style.display = 'block';
+            }
+        });
+        
+        // Add CSS fixes to ensure visibility
+        if (!document.getElementById('module-visibility-fixes')) {
+            const styleElement = document.createElement('style');
+            styleElement.id = 'module-visibility-fixes';
+            styleElement.textContent = `
+                .module-container {
+                    display: block !important;
+                    visibility: visible !important;
+                    margin-bottom: 40px !important;
+                }
+                
+                .module-content {
+                    display: block !important;
+                    visibility: visible !important;
+                }
+                
+                .accordion-content.active {
+                    display: block !important;
+                    max-height: 2000px !important;
+                    padding: 25px !important;
+                    visibility: visible !important;
+                }
+            `;
+            document.head.appendChild(styleElement);
         }
     }
 }
