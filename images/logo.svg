@@ -1,18 +1,7 @@
 <svg width="180" height="50" viewBox="0 0 180 50" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Logo Mark - Person/Identity icon part -->
-  <circle cx="20" cy="20" r="10" fill="#00A7B5" />
+  <!-- Text-based logo replacement -->
+  <text x="10" y="30" font-family="Roboto, sans-serif" font-weight="700" font-size="24" fill="#00A7B5">PlainID</text>
   
-  <!-- Curved D shape -->
-  <path d="M17 10C12 12 10 16 10 25C10 34 12 38 17 40" stroke="#00A7B5" stroke-width="2.5" fill="none" />
-  
-  <!-- Vertical line in i -->
-  <rect x="10" y="15" width="3" height="20" fill="#00A7B5" />
-  
-  <!-- plainID text -->
-  <path d="M55 20.5V33H50.5V14H54.5L55 15.5C56 14.5 57.8 13.5 60 13.5C63.3 13.5 66 16 66 20.5V33H61.5V20.5C61.5 18.5 60.5 17.5 58.5 17.5C56.5 17.5 55 18.5 55 20.5Z" fill="#002A3A" />
-  <path d="M68 14H72.5V33H68V14ZM68 7H72.5V11.5H68V7Z" fill="#002A3A" />
-  <path d="M85 13.5C88.3 13.5 91 16 91 20.5V33H86.5V20.5C86.5 18.5 85.5 17.5 83.5 17.5C81.5 17.5 80 18.5 80 20.5V33H75.5V14H79.5L80 15.5C81 14.5 82.8 13.5 85 13.5Z" fill="#002A3A" />
-  <path d="M103.5 13.5C108.5 13.5 111.5 18 111.5 23.5C111.5 29 108.5 33.5 103.5 33.5C101.5 33.5 99.8 32.5 98.5 31V40H94V14H98L98.5 16C99.8 14.5 101.5 13.5 103.5 13.5ZM102.5 29.5C105.3 29.5 107 27 107 23.5C107 20 105.3 17.5 102.5 17.5C100 17.5 98 19.5 98 23.5C98 27.5 100 29.5 102.5 29.5Z" fill="#002A3A" />
-  <path d="M113 14H117.5V33H113V14Z" fill="#002A3A" />
-  <path d="M113 7H117.5V11.5H113V7Z" fill="#002A3A" />
-  <path d="M119 23.5C119 18 123 13.5 128.5 13.5C134 13.5 138 18 138 23.5C138 29 134 33.5 128.5 33.5C123 33.5 119 29 119 23.5ZM133.5 23.5C133.5 20 131.5 17.5 128.5 17.5C125.5 17.5 123.5 20 123.5
+  <!-- Security text -->
+  <text x="115" y="30" font-family="Roboto, sans-serif" font-weight="400" font-size="12" fill="#002A3A">SECURITY</text>
+</svg>
